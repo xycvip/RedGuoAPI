@@ -1,0 +1,139 @@
+name: 恢复索引元数据
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_only:
+        description: 仅预览恢复结果；取消勾选后才会写入仓库
+        required: true
+        type: boolean
+        default: true
+      overwrite_existing:
+        description: 目标文件已存在时允许覆盖（默认禁止）
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: restore-index-metadata
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出仓库及历史记录
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 从清空前提交恢复索引元数据
+        env:
+          PREVIEW_ONLY: ${{ inputs.preview_only }}
+          OVERWRITE_EXISTING: ${{ inputs.overwrite_existing }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          SOURCE_COMMIT = "eb9241a6ae770f87bf0f4b965d6ed6edc21b4110"
+          FILES = (
+              "index.json",
+              "allindex.json",
+              "new-modules.json",
+              "sync-log.json",
+          )
+          preview_only = os.environ.get("PREVIEW_ONLY", "true").lower() == "true"
+          overwrite = os.environ.get("OVERWRITE_EXISTING", "false").lower() == "true"
+
+          def git_show(path):
+              result = subprocess.run(
+                  ["git", "show", f"{SOURCE_COMMIT}:{path}"],
+                  text=True, capture_output=True
+              )
+              if result.returncode != 0:
+                  raise RuntimeError(f"历史提交中找不到 {path}: {result.stderr.strip()}")
+              return result.stdout
+
+          restored = {}
+          for filename in FILES:
+              raw = git_show(filename)
+              data = json.loads(raw)
+
+              if filename in ("index.json", "allindex.json"):
+                  modules = data.get("modules")
+                  if not isinstance(modules, list):
+                      raise ValueError(f"{filename}: modules 必须是数组")
+
+                  seen = set()
+                  expected_root = "modules" if filename == "index.json" else "modules-all"
+                  for entry in modules:
+                      if not isinstance(entry, dict):
+                          raise ValueError(f"{filename}: 存在非对象模块条目")
+                      module_id = entry.get("id")
+                      if not isinstance(module_id, str) or not module_id:
+                          raise ValueError(f"{filename}: 存在无效模块 ID")
+                      if module_id in seen:
+                          raise ValueError(f"{filename}: 模块 ID 重复：{module_id}")
+                      seen.add(module_id)
+
+                      if filename == "allindex.json":
+                          old_path = entry.get("path", "")
+                          if old_path.startswith("moudules-all/"):
+                              entry["path"] = old_path.replace("moudules-all/", "modules-all/", 1)
+                          elif not old_path:
+                              entry["path"] = f"{expected_root}/{module_id}"
+                      elif not entry.get("path"):
+                          entry["path"] = f"{expected_root}/{module_id}"
+
+                  print(f"[CHECK] {filename}: {len(modules)} 个模块，ID 无重复")
+              elif not isinstance(data, dict):
+                  raise ValueError(f"{filename}: JSON 根节点必须是对象")
+
+              restored[filename] = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+
+          existing = [name for name in FILES if Path(name).exists()]
+          if existing and not overwrite:
+              raise SystemExit(
+                  "目标文件已存在，已停止以保护现有数据："
+                  + ", ".join(existing)
+                  + "。如确认覆盖，请重新运行并勾选 overwrite_existing。"
+              )
+
+          print("\n===== 恢复预览 =====")
+          print(f"来源提交：{SOURCE_COMMIT}")
+          print(f"恢复文件：{', '.join(FILES)}")
+          print(f"精简模块数：{len(json.loads(restored['index.json'])['modules'])}")
+          print(f"全量模块数：{len(json.loads(restored['allindex.json'])['modules'])}")
+          print("全量目录路径：moudules-all/ -> modules-all/")
+          print("SHA256、版本号、Tag、Release 地址及 adult 字段均保留历史值。")
+
+          if preview_only:
+              print("\n[PREVIEW] 当前为预览模式，没有写入或提交任何文件。")
+              raise SystemExit(0)
+
+          for filename, content in restored.items():
+              Path(filename).write_text(content, encoding="utf-8")
+
+          print("\n[RESTORED] 四份索引/辅助元数据文件已写入，准备提交。")
+          PY
+
+      - name: 提交恢复结果
+        if: ${{ !inputs.preview_only }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- index.json allindex.json new-modules.json sync-log.json
+          if git diff --cached --quiet; then
+            echo "恢复内容与当前仓库一致，无需提交。"
+            exit 0
+          fi
+          git commit -m "restore: 恢复清空前的索引元数据"
+          git push origin HEAD:main
