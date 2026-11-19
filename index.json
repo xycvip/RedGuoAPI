@@ -5,39 +5,6 @@
   "generatedAt": "2026-11-19",
   "modules": [
     {
-      "id": "hanxiaoquan",
-      "name": "韩小圈",
-      "version": "1.0.1",
-      "runtime": "js",
-      "api": 1,
-      "hosts": [
-        "www.jennyhow.com",
-        "jennyhow.com"
-      ],
-      "capabilities": [
-        "search"
-      ],
-      "aliases": [
-        "jennyhow.com",
-        "www.jennyhow.com"
-      ],
-      "baseUrl": "https://www.jennyhow.com",
-      "allowEmptyCatalog": true,
-      "upstream": "https://github.com/guoapp-modules/hanxiaoquan",
-      "upstreamRef": "main",
-      "sourceImport": "imported",
-      "license": "not-declared",
-      "repo": "xycvip/RedGuoAPI",
-      "path": "modules/hanxiaoquan",
-      "adult": false,
-      "tag": "hanxiaoquan-v1.0.1",
-      "releaseTag": "hanxiaoquan-v1.0.1",
-      "sha256": {"manifest.json":"0e4df821ae106434135d9697fe6f6bf26e4cc4b0f8f51811250f2ef850bf5d62","main.js":"fb5237db127315994456dac11bd392867cf3d24beab2cfc17f1d0b6cc2be6f05"},
-      "assetName": "hanxiaoquan-1.0.1.zip",
-      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hanxiaoquan-v1.0.1/hanxiaoquan-1.0.1.zip"
-
-    },
-    {
       "id": "hongguo",
       "name": "红果",
       "version": "1.0.4",
@@ -80,6 +47,39 @@
       "sha256": {"manifest.json":"2828dcb8225eaf13fefe9fd8045753a4ff36f6c67b134dd1865bb7b7ff1e74fe","main.js":"66a7a6d296b274d30f060ec2dfce5e4015be09ae0655eb505f8a348c9612f1d1"},
       "assetName": "hongguo-1.0.4.zip",
       "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hongguo-v1.0.4/hongguo-1.0.4.zip"
+
+    },
+    {
+      "id": "hanxiaoquan",
+      "name": "韩小圈",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "www.jennyhow.com",
+        "jennyhow.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "jennyhow.com",
+        "www.jennyhow.com"
+      ],
+      "baseUrl": "https://www.jennyhow.com",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/hanxiaoquan",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules/hanxiaoquan",
+      "adult": false,
+      "tag": "hanxiaoquan-v1.0.1",
+      "releaseTag": "hanxiaoquan-v1.0.1",
+      "sha256": {"manifest.json":"0e4df821ae106434135d9697fe6f6bf26e4cc4b0f8f51811250f2ef850bf5d62","main.js":"fb5237db127315994456dac11bd392867cf3d24beab2cfc17f1d0b6cc2be6f05"},
+      "assetName": "hanxiaoquan-1.0.1.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hanxiaoquan-v1.0.1/hanxiaoquan-1.0.1.zip"
 
     },
     {
