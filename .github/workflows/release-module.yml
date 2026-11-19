@@ -56,12 +56,9 @@ jobs:
                       ["git", "diff", "--name-only", before, after], text=True
                   ).splitlines()
                   for path in changed:
-                      m = re.match(r"^(?:modules|moudules-all)/([^/]+)/", path)
+                      m = re.match(r"^moudules-all/([^/]+)/", path)
                       if m:
                           selected.add(m.group(1))
-                      elif path == "index.json":
-                          data = json.loads(Path("index.json").read_text(encoding="utf-8"))
-                          selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
                       elif path == "allindex.json":
                           data = json.loads(Path("allindex.json").read_text(encoding="utf-8"))
                           selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
