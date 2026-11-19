@@ -45,11 +45,13 @@ jobs:
             let deleted = 0;
             let kept = 0;
             const failures = [];
+            const targets = [];
 
             core.info(cleanAll
               ? '模式：清理全部已完成的工作流运行记录'
               : '模式：只清理失败、取消、超时等异常运行记录');
 
+            // 先完整收集待删除 ID，再执行删除，避免删除第一页后分页位置变化而漏删。
             while (true) {
               const response = await github.rest.actions.listWorkflowRunsForRepo({
                 owner,
@@ -64,7 +66,6 @@ jobs:
               scanned += runs.length;
 
               for (const run of runs) {
-                // 不碰排队中或正在运行的任务。
                 if (run.status !== 'completed') {
                   kept++;
                   continue;
@@ -74,27 +75,30 @@ jobs:
                   ? true
                   : errorConclusions.has(run.conclusion);
 
-                if (!shouldDelete) {
+                if (shouldDelete) {
+                  targets.push({ id: run.id, name: run.name, conclusion: run.conclusion });
+                } else {
                   kept++;
-                  continue;
-                }
-
-                try {
-                  await github.rest.actions.deleteWorkflowRun({
-                    owner,
-                    repo,
-                    run_id: run.id
-                  });
-                  deleted++;
-                  core.info('已删除：#' + run.id + ' ' + run.name + '（' + run.conclusion + '）');
-                } catch (error) {
-                  failures.push({ id: run.id, message: error.message });
-                  core.warning('删除失败：#' + run.id + '：' + error.message);
                 }
               }
 
               if (runs.length < 100) break;
               page++;
+            }
+
+            for (const run of targets) {
+              try {
+                await github.rest.actions.deleteWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id
+                });
+                deleted++;
+                core.info('已删除：#' + run.id + ' ' + run.name + '（' + run.conclusion + '）');
+              } catch (error) {
+                failures.push({ id: run.id, message: error.message });
+                core.warning('删除失败：#' + run.id + '：' + error.message);
+              }
             }
 
             await core.summary
