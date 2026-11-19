@@ -45,7 +45,7 @@ jobs:
 
               manifest_path = next(
                   (root / module_id / "manifest.json"
-                   for root in (Path("modules"), Path("modules-adult"))
+                   for root in (Path("modules"), Path("moudules-all"))
                    if (root / module_id / "manifest.json").is_file()),
                   None
               )
