@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/huangju",
+  "ref": "main",
+  "sourceTreeSha": "587674e7dc26030d45fc6ed09dc8f50a55da0843",
+  "files": {
+    "manifest.json": "6a0b6e6a0876be2585a3f165d16b38209794029fa799482e283d7650117c36bf",
+    "main.js": "33dd8316c42f3e0fb34b189c50a6414e983a4b7b4cbe05bbbc8f24d20d6bff5b"
+  },
+  "importMethod": "source-copy"
+}
