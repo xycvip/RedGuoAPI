@@ -118,15 +118,6 @@
       "upstream": "guoapp-modules/hanime1",
       "sourceTreeSha": "9ddeca08004543d45c15e856271d6cc605a98ec2",
       "reviewStatus": "pending"
-    },
-    {
-      "id": "ikanbot",
-      "name": "爱看机器人",
-      "version": "1.0.4",
-      "importedAt": "2026-11-19",
-      "upstream": "guoapp-modules/ikanbot",
-      "sourceTreeSha": "9fb94aac2fb32a23ba4642ebaba3736036baa017",
-      "reviewStatus": "pending"
     }
   ]
 }
