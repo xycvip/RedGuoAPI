@@ -25,7 +25,7 @@ jobs:
           MODULE_ID: ${{ inputs.module_id }}
         run: |
           python - <<'PY'
-          import json, os, re, shutil
+          import filecmp, json, os, re, shutil
           from datetime import date
           from pathlib import Path
           module_id = os.environ["MODULE_ID"].strip()
@@ -33,8 +33,10 @@ jobs:
               raise SystemExit("模块 ID 格式无效")
           source = Path("moudules-all") / module_id
           target = Path("modules") / module_id
-          if not source.is_dir() or target.exists():
-              raise SystemExit("限制级模块不存在，或普通目录已存在")
+          # 普通模块根目录由工作流负责创建，不要求仓库预先提交空目录。
+          target.parent.mkdir(parents=True, exist_ok=True)
+          if not source.is_dir():
+              raise SystemExit(f"限制级模块源目录不存在：{source}")
           for f in ("main.js", "manifest.json", "UPSTREAM.json"):
               if not (source / f).is_file():
                   raise SystemExit(f"模块文件不完整：缺少 {f}")
@@ -51,12 +53,17 @@ jobs:
               raise SystemExit("新增记录不存在或该模块已处理；请检查 new-modules.json")
           standard_path, adult_path = Path("index.json"), Path("allindex.json")
           standard, adult = json.loads(standard_path.read_text(encoding="utf-8")), json.loads(adult_path.read_text(encoding="utf-8"))
-          if any(x["id"] == module_id for x in standard["modules"]):
-              raise SystemExit("普通索引已存在该模块")
+          standard_entry = next((x for x in standard["modules"] if x.get("id") == module_id), None)
           if not any(x["id"] == module_id for x in adult["modules"]):
               raise SystemExit("限制级索引中找不到该模块")
-          target.parent.mkdir(parents=True, exist_ok=True)
-          shutil.copytree(source, target)
+          if target.exists():
+              comparison = filecmp.dircmp(source, target)
+              if comparison.left_only or comparison.right_only or comparison.diff_files or comparison.funny_files:
+                  raise SystemExit(f"普通模块目录已存在且与限制级源目录内容不同，拒绝覆盖：{target}")
+              print(f"普通模块目录已存在且内容一致，按已复制处理：{target}")
+          else:
+              shutil.copytree(source, target)
+              print(f"已复制模块目录：{source} -> {target}")
           adult_entry = next(x for x in adult["modules"] if x["id"] == module_id)
           entry = {
               "id": module_id, "name": manifest["name"], "version": manifest["version"],
@@ -72,7 +79,10 @@ jobs:
           for key in ("tag", "releaseTag", "sha256", "assetName", "assetUrl"):
               if key in adult_entry:
                   entry[key] = adult_entry[key]
-          if module_id == "hongguo":
+          if standard_entry:
+              # 已有普通索引时不重复添加；保留现有发布记录。
+              print("普通索引已存在该模块，保留现有记录。")
+          elif module_id == "hongguo":
               standard["modules"].insert(0, entry)
           else:
               standard["modules"].append(entry)
