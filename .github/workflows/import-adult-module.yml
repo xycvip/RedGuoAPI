@@ -73,7 +73,7 @@ jobs:
           def digest(data):
               return hashlib.sha256(data).hexdigest()
 
-          def make_entry(module_id, manifest, category, branch, old=None):
+          def make_entry(module_id, manifest, category, branch, hashes, old=None):
               old = old or {}
               entry = {
                   "id": module_id,
@@ -91,11 +91,20 @@ jobs:
                   "sourceImport": "imported",
                   "license": old.get("license", "not-declared"),
                   "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
-                  "path": f"{'modules' if category == 'standard' else 'modules-all'}/{module_id}"
+                  "path": f"{'modules' if category == 'standard' else 'modules-all'}/{module_id}",
+                  # 两种索引都记录当前实际同步文件的 SHA256。
+                  "sha256": hashes
               }
+              # 保留旧索引中发布流程或未来扩展写入的字段，避免重建条目时丢失。
+              # 上游 manifest 和本次同步计算出的字段优先，旧值不能覆盖新数据。
+              for key, value in old.items():
+                  if key not in entry:
+                      entry[key] = value
               # adult 元数据完全沿用上游 manifest；上游未提供时不添加。
               if "adult" in manifest:
                   entry["adult"] = manifest["adult"]
+              else:
+                  entry.pop("adult", None)
               return entry
 
           def write_json(path, data):
@@ -220,7 +229,7 @@ jobs:
 
                           catalog = standard if category == "standard" else adult
                           old_entry = next((x for x in catalog["modules"] if x["id"] == module_id), None)
-                          entry = make_entry(module_id, manifest, category, branch, old_entry)
+                          entry = make_entry(module_id, manifest, category, branch, hashes, old_entry)
                           if old_entry != entry:
                               catalog["modules"] = [x for x in catalog["modules"] if x["id"] != module_id]
                               catalog["modules"].append(entry)
