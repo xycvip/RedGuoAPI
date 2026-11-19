@@ -73,8 +73,8 @@ jobs:
           def digest(data):
               return hashlib.sha256(data).hexdigest()
 
-          def make_entry(module_id, manifest, category, branch):
-              old = entry_map.get(module_id, {})
+          def make_entry(module_id, manifest, category, branch, old=None):
+              old = old or {}
               entry = {
                   "id": module_id,
                   "name": manifest["name"],
@@ -172,20 +172,27 @@ jobs:
                       commit_sha = commit_info["sha"]
                       summary["moduleRepositories"] += 1
 
-                      category = location_map.get(module_id)
-                      is_new = category is None
+                      standard_target = Path("modules") / module_id
+                      adult_target = Path("moudules-all") / module_id
+                      standard_exists = (
+                          any(x["id"] == module_id for x in standard["modules"])
+                          or standard_target.exists()
+                      )
+                      adult_exists = (
+                          any(x["id"] == module_id for x in adult["modules"])
+                          or adult_target.exists()
+                      )
+                      is_new = not standard_exists and not adult_exists
+                      categories = []
+                      if standard_exists:
+                          categories.append("standard")
+                      if adult_exists:
+                          categories.append("adult")
                       if is_new:
-                          category = "adult"
-                      root = Path("modules" if category == "standard" else "moudules-all")
-                      target = root / module_id
-                      target.mkdir(parents=True, exist_ok=True)
+                          # 新模块默认进入全量包，等待人工核查。
+                          categories = ["adult"]
+
                       files = {"manifest.json": manifest_bytes, "main.js": main_bytes}
-                      changed = is_new
-                      for filename, content in files.items():
-                          destination = target / filename
-                          if not destination.exists() or destination.read_bytes() != content:
-                              destination.write_bytes(content)
-                              changed = True
                       hashes = {name: digest(content) for name, content in files.items()}
                       upstream_record = {
                           "repository": f"{ORG}/{module_id}",
@@ -194,19 +201,36 @@ jobs:
                           "files": hashes,
                           "importMethod": "source-copy"
                       }
-                      upstream_path = target / "UPSTREAM.json"
-                      upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\n"
-                      if not upstream_path.exists() or upstream_path.read_text(encoding="utf-8") != upstream_text:
-                          upstream_path.write_text(upstream_text, encoding="utf-8")
-                          changed = True
+                      upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\\n"
+                      changed_any = False
 
-                      entry = make_entry(module_id, manifest, category, branch)
-                      catalog = standard if category == "standard" else adult
-                      old_entry = next((x for x in catalog["modules"] if x["id"] == module_id), None)
-                      if old_entry != entry:
-                          catalog["modules"] = [x for x in catalog["modules"] if x["id"] != module_id]
-                          catalog["modules"].append(entry)
-                          changed = True
+                      # 两种分发形态分别同步：存在于哪个目录/索引，就更新哪个。
+                      for category in categories:
+                          root = Path("modules" if category == "standard" else "moudules-all")
+                          target = root / module_id
+                          target.mkdir(parents=True, exist_ok=True)
+                          changed = False
+
+                          for filename, content in files.items():
+                              destination = target / filename
+                              if not destination.exists() or destination.read_bytes() != content:
+                                  destination.write_bytes(content)
+                                  changed = True
+
+                          upstream_path = target / "UPSTREAM.json"
+                          if not upstream_path.exists() or upstream_path.read_text(encoding="utf-8") != upstream_text:
+                              upstream_path.write_text(upstream_text, encoding="utf-8")
+                              changed = True
+
+                          catalog = standard if category == "standard" else adult
+                          old_entry = next((x for x in catalog["modules"] if x["id"] == module_id), None)
+                          entry = make_entry(module_id, manifest, category, branch, old_entry)
+                          if old_entry != entry:
+                              catalog["modules"] = [x for x in catalog["modules"] if x["id"] != module_id]
+                              catalog["modules"].append(entry)
+                              changed = True
+
+                          changed_any = changed_any or changed
 
                       if is_new:
                           new_log["modules"].append({
@@ -215,7 +239,7 @@ jobs:
                               "sourceTreeSha": commit_sha, "reviewStatus": "pending"
                           })
                           summary["added"].append(module_id)
-                      elif changed:
+                      elif changed_any:
                           summary["updated"].append(module_id)
                       else:
                           summary["unchanged"].append(module_id)
