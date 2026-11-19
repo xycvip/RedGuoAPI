@@ -1,4 +1,4 @@
-name: 人工核查并转为普通模块
+name: 人工核查并复制为普通模块
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-      - name: 核查并迁移到普通模块
+      - name: 核查并复制到普通模块
         env:
           MODULE_ID: ${{ inputs.module_id }}
         run: |
@@ -56,10 +56,8 @@ jobs:
           if not any(x["id"] == module_id for x in adult["modules"]):
               raise SystemExit("限制级索引中找不到该模块")
           target.parent.mkdir(parents=True, exist_ok=True)
-          shutil.move(str(source), str(target))
+          shutil.copytree(source, target)
           adult_entry = next(x for x in adult["modules"] if x["id"] == module_id)
-          adult["modules"] = [x for x in adult["modules"] if x["id"] != module_id]
-          adult["generatedAt"] = date.today().isoformat()
           entry = {
               "id": module_id, "name": manifest["name"], "version": manifest["version"],
               "runtime": manifest["runtime"], "api": manifest["api"],
@@ -70,7 +68,7 @@ jobs:
               "upstreamRef": upstream.get("ref", "main"), "sourceImport": "imported",
               "license": "not-declared", "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"), "path": "modules/" + module_id
           }
-          # 保留原限制级索引中已有的发布信息，避免迁移后 ZIP 下载地址和校验值丢失。
+          # 复制后保留限制级索引原记录；普通索引复用其发布信息。
           for key in ("tag", "releaseTag", "sha256", "assetName", "assetUrl"):
               if key in adult_entry:
                   entry[key] = adult_entry[key]
@@ -79,13 +77,13 @@ jobs:
           else:
               standard["modules"].append(entry)
           standard["generatedAt"] = date.today().isoformat()
-          # 已完成核查并迁移：从待核查新增记录中彻底移除。
+          # 已完成核查并复制：从待核查新增记录中移除，但保留限制级模块及其索引。
           log["modules"] = [x for x in log["modules"] if x.get("id") != module_id]
           log["generatedAt"] = date.today().isoformat()
           standard_path.write_text(json.dumps(standard, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           adult_path.write_text(json.dumps(adult, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-          print(f"核查迁移完成：{module_id} 已转入普通模块，并已从新增核查记录中移除。")
+          print(f"核查复制完成：{module_id} 已复制到普通模块；限制级原件及 allindex.json 记录均已保留。")
           PY
       - name: 提交核查结果并触发发布及校验
         env:
@@ -95,7 +93,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- modules moudules-all index.json allindex.json new-modules.json
-          git commit -m "promote: 人工核查通过转为普通模块 ${{ inputs.module_id }}"
+          git commit -m "promote: 人工核查通过复制为普通模块 ${{ inputs.module_id }}"
           git push origin HEAD:main
           # GITHUB_TOKEN 推送不会触发 push 工作流，因此显式派发后续任务。
           gh workflow run release-module.yml --ref main -f module_id="$MODULE_ID"
