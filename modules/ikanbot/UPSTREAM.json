@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/ikanbot",
+  "ref": "main",
+  "sourceTreeSha": "9fb94aac2fb32a23ba4642ebaba3736036baa017",
+  "files": {
+    "manifest.json": "aa973e87f75aaee68e36881a3bda7b5eebaea80788b70e3a9141dcf9006fcc1a",
+    "main.js": "db1b3ddc6477f3cbb738c73f407e63b530831916b64410f9a002fc2f86b04a92"
+  },
+  "importMethod": "source-copy"
+}
