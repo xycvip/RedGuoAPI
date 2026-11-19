@@ -122,28 +122,60 @@ jobs:
           repository = os.environ["REPOSITORY"]
           token = os.environ["GH_TOKEN"]
           modules = [x for x in os.environ["MODULES"].split(",") if x]
-          catalogs = [
-              (Path("allindex.json"), Path("modules-all")),
-          ]
+          full_catalog = Path("allindex.json")
+          full_root = Path("modules-all")
+          short_catalog = Path("index.json")
           changed_catalogs = set()
+
+          def write_release_metadata(module_id, version, tag, hashes, asset_filename, asset_url):
+              # 全量索引是发布源；精简索引只复用全量包中相同模块的 Release 信息。
+              for catalog_path, root in ((full_catalog, full_root), (short_catalog, Path("modules"))):
+                  if not catalog_path.is_file():
+                      continue
+                  catalog_data = json.loads(catalog_path.read_text(encoding="utf-8"))
+                  catalog_entry = next(
+                      (x for x in catalog_data.get("modules", [])
+                       if isinstance(x, dict) and x.get("id") == module_id),
+                      None
+                  )
+                  if catalog_entry is None:
+                      continue
+                  values = {
+                      "version": version,
+                      "tag": tag,
+                      "releaseTag": tag,
+                      "repo": repository,
+                      "path": f"{root.as_posix()}/{module_id}",
+                      "sha256": hashes,
+                      "assetName": asset_filename,
+                      "assetUrl": asset_url,
+                  }
+                  changed = any(catalog_entry.get(k) != v for k, v in values.items())
+                  if changed:
+                      catalog_entry.update(values)
+                      catalog_data["generatedAt"] = date.today().isoformat()
+                      catalog_path.write_text(
+                          json.dumps(catalog_data, ensure_ascii=False, indent=2) + "\n",
+                          encoding="utf-8"
+                      )
+                      changed_catalogs.add(catalog_path)
 
           def gh(*args, check=True):
               return subprocess.run(["gh", *args], text=True, capture_output=True, check=check)
 
           for module_id in modules:
               try:
-                  found = None
-                  for catalog_path, root in catalogs:
-                      data = json.loads(catalog_path.read_text(encoding="utf-8"))
-                      entry = next((x for x in data.get("modules", []) if x.get("id") == module_id), None)
-                      if entry:
-                          found = (catalog_path, root, data, entry)
-                          break
-                  if not found:
-                      print(f"[SKIP] {module_id}: 两个索引中均不存在")
+                  data = json.loads(full_catalog.read_text(encoding="utf-8"))
+                  entry = next(
+                      (x for x in data.get("modules", [])
+                       if isinstance(x, dict) and x.get("id") == module_id),
+                      None
+                  )
+                  if entry is None:
+                      print(f"[SKIP] {module_id}: 全量索引中不存在")
                       continue
 
-                  catalog_path, root, data, entry = found
+                  root = full_root
                   folder = root / module_id
                   manifest_path, main_path = folder / "manifest.json", folder / "main.js"
                   if not manifest_path.is_file() or not main_path.is_file():
@@ -203,22 +235,12 @@ jobs:
                       else:
                           repaired_action = "已有 Release 与附件"
 
+                      asset_url = asset.get("browser_download_url") or f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
+                      write_release_metadata(module_id, version, tag, hashes, asset_filename, asset_url)
                       if old_release == tag and old_hashes == hashes and entry.get("assetName") == asset_filename and entry.get("assetUrl") and entry.get("tag") == tag:
-                          print(f"[UNCHANGED] {module_id} {version}: Release、附件及文件指纹均未变化")
-                          continue
-
-                      entry["version"] = version
-                      entry["tag"] = tag
-                      entry["releaseTag"] = tag
-                      entry["repo"] = repository
-                      entry["path"] = f"{root.as_posix()}/{module_id}"
-                      entry["sha256"] = hashes
-                      entry["assetName"] = asset_filename
-                      entry["assetUrl"] = asset.get("browser_download_url") or f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
-                      data["generatedAt"] = date.today().isoformat()
-                      catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-                      changed_catalogs.add(catalog_path)
-                      print(f"[REPAIRED] {module_id} {version}: {repaired_action}，索引元数据已核验并补齐")
+                          print(f"[UNCHANGED] {module_id} {version}: Release、附件及文件指纹未变化；已检查两份索引")
+                      else:
+                          print(f"[REPAIRED] {module_id} {version}: {repaired_action}，发布信息已同步到两份索引")
                       continue
 
                   # GitHub 上不存在该版本 Release：即使索引保留旧 tag/hash，也按首次发布创建。
@@ -246,18 +268,9 @@ jobs:
                       print(f"[ERROR] {module_id}: 附件名验证失败，实际为 {patched.get('name')}")
                       continue
 
-                  entry["version"] = version
-                  entry["tag"] = tag
-                  entry["releaseTag"] = tag
-                  entry["repo"] = repository
-                  entry["path"] = f"{root.as_posix()}/{module_id}"
-                  entry["sha256"] = hashes
-                  entry["assetName"] = asset_filename
-                  entry["assetUrl"] = f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
-                  data["generatedAt"] = date.today().isoformat()
-                  catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-                  changed_catalogs.add(catalog_path)
-                  print(f"[PUBLISHED] {module_id} {version} -> {tag}")
+                  asset_url = f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
+                  write_release_metadata(module_id, version, tag, hashes, asset_filename, asset_url)
+                  print(f"[PUBLISHED] {module_id} {version} -> {tag}；发布信息已同步到两份索引（精简索引中存在该模块时）")
               except Exception as exc:
                   print(f"[ERROR] {module_id}: {type(exc).__name__}: {exc}")
 
