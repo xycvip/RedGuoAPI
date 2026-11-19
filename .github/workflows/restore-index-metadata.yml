@@ -27,11 +27,12 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: 核查并仅补全缺失数据
+      - name: 严格核查并仅补全缺失数据
         env:
           PREVIEW_ONLY: ${{ inputs.preview_only }}
         run: |
           python - <<'PY'
+          import hashlib
           import json
           import os
           import re
@@ -43,19 +44,28 @@ jobs:
           full_file = Path("allindex.json")
           standard_root = Path("modules")
           full_root = Path("modules-all")
-
-          # 只同步发布元数据；不复制 adult、版本基础信息或其他已有字段。
           metadata_keys = ("tag", "releaseTag", "sha256", "assetName", "assetUrl")
           required_files = ("manifest.json", "main.js", "UPSTREAM.json")
+          hash_files = ("manifest.json", "main.js")
 
           def load_json(path):
               if not path.is_file():
                   raise RuntimeError(f"必要文件不存在：{path}")
-              return json.loads(path.read_text(encoding="utf-8"))
+              try:
+                  return json.loads(path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  raise RuntimeError(f"JSON 解析失败：{path}: {exc}") from exc
 
+          def sha256_file(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          standard_text = standard_file.read_text(encoding="utf-8")
           standard = load_json(standard_file)
           full = load_json(full_file)
-
           if not isinstance(standard.get("modules"), list):
               raise RuntimeError("index.json 的 modules 必须是数组")
           if not isinstance(full.get("modules"), list):
@@ -76,60 +86,77 @@ jobs:
 
           standard_map = index_by_id(standard, "index.json")
           full_map = index_by_id(full, "allindex.json")
-
           missing_from_full = sorted(set(standard_map) - set(full_map))
           if missing_from_full:
-              raise RuntimeError(
-                  "精简索引中的模块在全量索引中不存在，停止操作，不做猜测："
-                  + ", ".join(missing_from_full)
-              )
+              raise RuntimeError("精简索引模块在全量索引中不存在：" + ", ".join(missing_from_full))
 
-          # 所有来源先完成预检；任何一个全量源不完整，都不开始写入。
           source_dirs = {}
-          for module_id in sorted(standard_map):
-              full_entry = full_map[module_id]
-              expected_source = f"modules-all/{module_id}"
-              if full_entry.get("path") != expected_source:
-                  raise RuntimeError(
-                      f"{module_id}: 全量索引 path 不匹配，预期 {expected_source}，"
-                      f"实际 {full_entry.get('path')!r}"
-                  )
-              source_dir = full_root / module_id
-              if not source_dir.is_dir():
-                  raise RuntimeError(f"{module_id}: 全量来源目录不存在：{source_dir}")
-              for filename in required_files:
-                  if not (source_dir / filename).is_file():
-                      raise RuntimeError(f"{module_id}: 全量来源缺少必需文件：{source_dir / filename}")
-              source_dirs[module_id] = source_dir
-
-              target_path = standard_map[module_id].get("path")
-              expected_target = f"modules/{module_id}"
-              if target_path != expected_target:
-                  raise RuntimeError(
-                      f"{module_id}: 精简索引 path 不匹配，预期 {expected_target}，"
-                      f"实际 {target_path!r}"
-                  )
-
           metadata_additions = []
           file_additions = []
+          conflicts = []
 
-          # 只对精简索引条目中完全不存在的发布元数据字段补值。
+          # 先完成所有核查；任一数据不匹配都停止，绝不进入写入阶段。
           for module_id in sorted(standard_map):
               target_entry = standard_map[module_id]
               source_entry = full_map[module_id]
-              for key in metadata_keys:
-                  if key not in target_entry and key in source_entry:
-                      target_entry[key] = source_entry[key]
-                      metadata_additions.append(f"{module_id}.{key}")
-
-          # 从全量目录逐文件补缺：目标已存在的文件绝不覆盖。
-          for module_id in sorted(standard_map):
-              source_dir = source_dirs[module_id]
+              source_dir = full_root / module_id
               target_dir = standard_root / module_id
 
-              if os.path.lexists(target_dir) and not target_dir.is_dir():
-                  raise RuntimeError(f"目标路径类型冲突，拒绝覆盖：{target_dir}")
+              if source_entry.get("path") != f"modules-all/{module_id}":
+                  raise RuntimeError(f"{module_id}: 全量索引 path 不正确")
+              if target_entry.get("path") != f"modules/{module_id}":
+                  raise RuntimeError(f"{module_id}: 精简索引 path 不正确")
+              if not source_dir.is_dir():
+                  raise RuntimeError(f"{module_id}: 全量来源目录不存在")
+              if not target_dir.is_dir():
+                  raise RuntimeError(f"{module_id}: 精简目标目录不存在")
 
+              # 身份字段必须一致；adult 只核查，不赋值、不同步。
+              for key in ("id", "name", "version", "upstream", "adult"):
+                  if target_entry.get(key) != source_entry.get(key):
+                      raise RuntimeError(f"{module_id}: 两份索引的 {key} 不一致，停止恢复")
+              source_manifest = load_json(source_dir / "manifest.json")
+              for key in ("id", "version", "adult"):
+                  if source_manifest.get(key) != source_entry.get(key):
+                      raise RuntimeError(f"{module_id}: 全量 manifest.json 的 {key} 与全量索引不一致")
+
+              for filename in required_files:
+                  if not (source_dir / filename).is_file():
+                      raise RuntimeError(f"{module_id}: 全量来源缺少 {filename}")
+              source_upstream = load_json(source_dir / "UPSTREAM.json")
+              upstream_hashes = source_upstream.get("files")
+              expected_hashes = source_entry.get("sha256")
+              if not isinstance(expected_hashes, dict):
+                  raise RuntimeError(f"{module_id}: 全量索引缺少有效 sha256 对象")
+              if not isinstance(upstream_hashes, dict):
+                  raise RuntimeError(f"{module_id}: UPSTREAM.json 缺少有效 files 哈希对象")
+
+              for filename in hash_files:
+                  expected_hash = expected_hashes.get(filename)
+                  if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_hash):
+                      raise RuntimeError(f"{module_id}: 全量索引 {filename} SHA256 格式无效")
+                  if upstream_hashes.get(filename) != expected_hash:
+                      raise RuntimeError(f"{module_id}: allindex.json 与 UPSTREAM.json 的 {filename} SHA256 不一致")
+                  actual_source_hash = sha256_file(source_dir / filename)
+                  if actual_source_hash.lower() != expected_hash.lower():
+                      raise RuntimeError(f"{module_id}: 全量来源 {filename} 实际 SHA256 不匹配")
+                  target_file = target_dir / filename
+                  if not target_file.is_file():
+                      raise RuntimeError(f"{module_id}: 精简目录缺少核心文件 {filename}，为避免误补本次停止")
+                  if sha256_file(target_file) != actual_source_hash:
+                      raise RuntimeError(f"{module_id}: 精简与全量的 {filename} 内容不一致，拒绝覆盖")
+
+              # 已有发布字段若与全量来源冲突，不覆盖也不忽略，直接停止。
+              for key in metadata_keys:
+                  if key in target_entry:
+                      if key in source_entry and target_entry[key] != source_entry[key]:
+                          raise RuntimeError(f"{module_id}: 已有字段 {key} 与全量来源不一致，拒绝修改")
+                  elif key in source_entry:
+                      metadata_additions.append((module_id, key, source_entry[key]))
+
+              source_dirs[module_id] = source_dir
+
+              # 其他辅助文件仅补不存在的文件；已有文件一律不覆盖。
               for source in sorted(source_dir.rglob("*")):
                   if source.is_dir():
                       continue
@@ -137,59 +164,115 @@ jobs:
                       raise RuntimeError(f"全量来源包含符号链接，拒绝复制：{source}")
                   relative = source.relative_to(source_dir)
                   target = target_dir / relative
-
                   if os.path.lexists(target):
                       if target.is_dir():
-                          raise RuntimeError(f"目标文件路径已被目录占用，拒绝覆盖：{target}")
+                          raise RuntimeError(f"目标文件路径被目录占用：{target}")
                       continue
-
                   file_additions.append((source, target))
 
-          print("===== 核查与补全预览 =====")
-          print(f"精简模块：{len(standard_map)} 个")
-          print(f"全量模块：{len(full_map)} 个")
-          print(f"待补发布元数据字段：{len(metadata_additions)} 项")
-          for item in metadata_additions:
-              print(f"  [补字段] {item}")
-          print(f"待补文件：{len(file_additions)} 个")
-          for source, target in file_additions:
-              print(f"  [补文件] {source} -> {target}")
-          print("保护规则：不覆盖任何已有字段或文件；不修改 allindex.json。")
-          print("不修改 adult、版本基础信息、Tag/Release、上游文件及其他辅助文件。")
+          # 对 JSON 做局部文本补丁，只在对应模块对象末尾插入缺失字段。
+          # 不重新序列化整个 index.json，保留所有既有字段和值的原始文本。
+          def patch_module_objects(original_text, additions):
+              by_id = {}
+              for module_id, key, value in additions:
+                  by_id.setdefault(module_id, {})[key] = value
+              if not by_id:
+                  return original_text
 
+              match = re.search(r'"modules"\\s*:\\s*\\[', original_text)
+              if not match:
+                  raise RuntimeError("无法定位 index.json 的 modules 数组")
+              decoder = json.JSONDecoder()
+              pos = match.end()
+              spans = []
+              while True:
+                  while pos < len(original_text) and (original_text[pos].isspace() or original_text[pos] == ","):
+                      pos += 1
+                  if pos >= len(original_text) or original_text[pos] == "]":
+                      break
+                  start = pos
+                  obj, end = decoder.raw_decode(original_text, pos)
+                  if not isinstance(obj, dict):
+                      raise RuntimeError("modules 数组中出现非对象条目")
+                  spans.append((start, end, obj))
+                  pos = end
+
+              replacements = []
+              for start, end, obj in spans:
+                  module_id = obj.get("id")
+                  fields = by_id.get(module_id)
+                  if not fields:
+                      continue
+                  if any(key in obj for key in fields):
+                      raise RuntimeError(f"{module_id}: 文本补丁前发现字段状态变化，停止")
+                  closing = end - 1
+                  prefix = original_text[start:closing]
+                  trimmed = prefix.rstrip()
+                  close_indent = prefix[len(trimmed):]
+                  if "\n" not in prefix:
+                      raise RuntimeError(f"{module_id}: JSON 对象不是多行格式，拒绝执行不安全补丁")
+                  last_line_start = trimmed.rfind("\n") + 1
+                  property_indent = re.match(r"[ \\t]*", trimmed[last_line_start:]).group(0)
+                  if not property_indent:
+                      raise RuntimeError(f"{module_id}: 无法识别 JSON 字段缩进")
+                  new_lines = [
+                      property_indent + json.dumps(key, ensure_ascii=False) + ": " +
+                      json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                      for key, value in fields.items()
+                  ]
+                  replacement = trimmed + ",\\n" + ",\\n".join(new_lines) + "\\n" + close_indent + "}"
+                  replacements.append((start, end, replacement))
+
+              patched = original_text
+              for start, end, replacement in reversed(replacements):
+                  patched = patched[:start] + replacement + patched[end:]
+              parsed = json.loads(patched)
+              for module_id, fields in by_id.items():
+                  entry = next(item for item in parsed["modules"] if item["id"] == module_id)
+                  for key, value in fields.items():
+                      if entry.get(key) != value:
+                          raise RuntimeError(f"{module_id}.{key}: 文本补丁结果校验失败")
+              return patched
+
+          patched_index = patch_module_objects(standard_text, metadata_additions)
+
+          print("===== 严格核查与补全预览 =====")
+          print(f"精简模块：{len(standard_map)} 个；全量模块：{len(full_map)} 个")
+          print("身份字段、adult、manifest ID/版本、文件 SHA256、精简/全量核心文件一致性：全部通过")
+          print(f"待补发布元数据字段：{len(metadata_additions)} 项")
+          for module_id, key, _ in metadata_additions:
+              print(f"  [仅补缺失] {module_id}.{key}")
+          print(f"待补辅助文件：{len(file_additions)} 个")
+          for source, target in file_additions:
+              print(f"  [仅复制缺失] {source} -> {target}")
+          print("保护规则：不覆盖已有字段或文件；不修改 adult、基础信息、allindex.json、Tag/Release 或上游内容。")
           if preview_only:
-              print("[PREVIEW] 预览结束，未写入任何文件。")
+              print("[PREVIEW] 全部核查通过；预览模式，未写入任何文件。")
               raise SystemExit(0)
 
-          # 只在确有缺失字段时写 index.json；不触碰 allindex.json。
+          # 所有校验均已通过，才开始写入。
           if metadata_additions:
-              standard_file.write_text(
-                  json.dumps(standard, ensure_ascii=False, indent=2) + "\n",
-                  encoding="utf-8"
-              )
+              standard_file.write_text(patched_index, encoding="utf-8")
 
           copied = 0
           for source, target in file_additions:
               target.parent.mkdir(parents=True, exist_ok=True)
-              # 再次检查，确保不会因目标已存在而覆盖。
               if os.path.lexists(target):
                   continue
               shutil.copy2(source, target)
               copied += 1
 
-          # 写入后检查所有精简模块必需文件及已补元数据。
+          final_index = load_json(standard_file)
+          final_map = index_by_id(final_index, "index.json")
+          for module_id, key, value in metadata_additions:
+              if final_map[module_id].get(key) != value:
+                  raise RuntimeError(f"写入后校验失败：{module_id}.{key}")
           for module_id in sorted(standard_map):
-              target_dir = standard_root / module_id
               for filename in required_files:
-                  if not (target_dir / filename).is_file():
-                      raise RuntimeError(f"补全后仍缺少必需文件：{target_dir / filename}")
-              target_entry = standard_map[module_id]
-              source_entry = full_map[module_id]
-              for key in metadata_keys:
-                  if key in source_entry and key not in target_entry:
-                      raise RuntimeError(f"补全后仍缺少元数据：{module_id}.{key}")
+                  if not (standard_root / module_id / filename).is_file():
+                      raise RuntimeError(f"补全后仍缺少文件：modules/{module_id}/{filename}")
 
-          print(f"[DONE] 新增元数据字段 {len(metadata_additions)} 项，复制缺失文件 {copied} 个。")
+          print(f"[DONE] 新增缺失元数据 {len(metadata_additions)} 项，复制缺失辅助文件 {copied} 个。")
           if not metadata_additions and copied == 0:
               print("[NO-OP] 没有缺失数据，无需提交。")
           PY
