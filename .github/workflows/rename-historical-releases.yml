@@ -1,0 +1,129 @@
+name: 历史模块发布整理
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rename-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: 整理历史 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, re, subprocess
+          from urllib.parse import quote
+          from pathlib import Path
+
+          repo = os.environ["REPOSITORY"]
+
+          def gh(*args, check=True, input_data=None):
+              return subprocess.run(["gh", *args], input=input_data, text=True, capture_output=True, check=check)
+
+          releases = json.loads(gh("api", f"repos/{repo}/releases?per_page=100").stdout)
+          catalogs = [Path("index.json"), Path("adult-index.json")]
+          catalog_data = {p: json.loads(p.read_text(encoding="utf-8")) for p in catalogs}
+          renamed = 0
+          errors = []
+
+          for release in releases:
+              tag = release.get("tag_name", "")
+              match = re.fullmatch(r"([a-z0-9][a-z0-9-]*)-v(\d+\.\d+\.\d+)", tag)
+              if not match:
+                  continue
+              module_id, version = match.groups()
+
+              manifest_path = next(
+                  (root / module_id / "manifest.json"
+                   for root in (Path("modules"), Path("modules-adult"))
+                   if (root / module_id / "manifest.json").is_file()),
+                  None
+              )
+              if not manifest_path:
+                  print(f"[SKIP] {tag}: 本地找不到模块 manifest")
+                  continue
+
+              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+              if manifest.get("id") != module_id:
+                  print(f"[SKIP] {tag}: manifest ID 不匹配")
+                  continue
+              name = str(manifest.get("name") or module_id).strip()
+              filename = f"{module_id}-{version}.zip"
+              assets = release.get("assets", [])
+              zip_assets = [a for a in assets if a.get("name", "").lower().endswith(".zip")]
+              if not zip_assets:
+                  print(f"[SKIP] {tag}: 没有 ZIP 附件")
+                  continue
+
+              expected = next((a for a in zip_assets if a["name"] == filename), None)
+              if expected:
+                  keep = expected
+                  print(f"[OK] {tag}: 附件名称已经正确：{filename}")
+              else:
+                  # 直接通过 Release Asset API 修改名称，避免上传环节截断中文。
+                  source = zip_assets[0]
+                  # 使用 JSON 请求体传递 UTF-8，避免表单编码把中文文件名截断。
+                  payload = json.dumps({"name": filename}, ensure_ascii=False)
+                  patch = gh("api", "--method", "PATCH", f"repos/{repo}/releases/assets/{source['id']}", "--input", "-", check=False, input_data=payload)
+                  if patch.returncode != 0:
+                      message = f"{tag}: GitHub API 修改附件名失败：{patch.stderr.strip()}"
+                      print(f"[ERROR] {message}")
+                      errors.append(message)
+                      continue
+                  patched = json.loads(patch.stdout)
+                  if patched.get("name") != filename:
+                      message = f"{tag}: 附件名验证失败，实际为 {patched.get('name')}"
+                      print(f"[ERROR] {message}")
+                      errors.append(message)
+                      continue
+                  keep = patched
+                  renamed += 1
+                  print(f"[RENAMED] {tag}: {source['name']} -> {filename}")
+
+              for asset in zip_assets:
+                  if asset.get("id") == keep.get("id"):
+                      continue
+                  deleted = gh("api", "-X", "DELETE", f"repos/{repo}/releases/assets/{asset['id']}", check=False)
+                  if deleted.returncode != 0:
+                      message = f"{tag}: 删除多余附件失败：{asset['name']}"
+                      print(f"[ERROR] {message}")
+                      errors.append(message)
+
+              expected_url = f"https://github.com/{repo}/releases/download/{tag}/{quote(filename, safe='')}"
+
+              notes = f"模块：{name}\n版本：{version}\n\n由 RedGuoAPI 自动检测上游更新并发布。ZIP 仅包含 manifest.json 和 main.js。"
+              edit = gh("release", "edit", tag, "--title", f"{name} v{version}", "--notes", notes, check=False)
+              if edit.returncode != 0:
+                  print(f"[WARN] {tag}: 附件已处理，但 Release 说明更新失败：{edit.stderr.strip()}")
+
+              for path, data in catalog_data.items():
+                  for entry in data.get("modules", []):
+                      if entry.get("id") == module_id:
+                          entry["assetName"] = filename
+                          entry["assetUrl"] = f"https://github.com/{repo}/releases/download/{tag}/{quote(filename, safe='')}"
+
+          for path, data in catalog_data.items():
+              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+          subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
+          subprocess.run(["git", "add", "index.json", "adult-index.json"], check=True)
+          diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
+          if diff.returncode != 0:
+              subprocess.run(["git", "commit", "-m", "chore(release): 统一历史模块 ID+版本号附件命名"], check=True)
+              subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
+
+          print(f"历史 Release 整理完成，改名处理 {renamed} 个。")
+          if errors:
+              raise SystemExit(f"历史整理存在 {len(errors)} 个错误，不能标记成功。")
+          PY
