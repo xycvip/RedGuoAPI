@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/sorani",
+  "ref": "main",
+  "sourceTreeSha": "d92cb82185a6e036831575c26ee0feee0047fbb2",
+  "files": {
+    "manifest.json": "2a7ad59c3396a894b6a1829034e40bc226208678e770dafe6f50eb0edf9bdf9b",
+    "main.js": "1281e5b325c12407e1e438556ad63251d95e71c137501d52e2d2f919a37d4eaf"
+  },
+  "importMethod": "source-copy"
+}
