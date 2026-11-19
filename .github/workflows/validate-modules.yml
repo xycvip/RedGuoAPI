@@ -1,0 +1,79 @@
+name: 校验模块目录
+on:
+  push:
+    branches: [main]
+    paths: ["index.json", "adult-index.json", "new-modules.json", "modules/**", "modules-adult/**", ".github/workflows/**"]
+  pull_request:
+    branches: [main]
+    paths: ["index.json", "adult-index.json", "new-modules.json", "modules/**", "modules-adult/**", ".github/workflows/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: 校验普通模块、限制级模块及新增核查记录
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          repo = os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI")
+          catalogs = [
+              ("index.json", Path("modules"), "standard"),
+              ("adult-index.json", Path("modules-adult"), "adult"),
+          ]
+          seen = set()
+          catalog_ids = {}
+          for catalog_name, root, category in catalogs:
+              data = json.loads(Path(catalog_name).read_text(encoding="utf-8"))
+              assert data.get("format") == 1
+              assert data.get("repository") == repo
+              assert data.get("category") == category
+              entries = data.get("modules")
+              assert isinstance(entries, list) and entries
+              catalog_ids[catalog_name] = {x["id"] for x in entries}
+              for entry in entries:
+                  for key in ("id", "name", "version", "runtime", "api", "upstream", "license", "path", "repo"):
+                      assert entry.get(key), f"{catalog_name}: missing {key}: {entry}"
+                  module_id = entry["id"]
+                  assert module_id not in seen, f"duplicate module id: {module_id}"
+                  seen.add(module_id)
+                  assert entry.get("runtime") == "js" and entry.get("api") == 1
+                  assert isinstance(entry.get("hosts"), list)
+                  assert entry.get("sourceImport") == "imported"
+                  assert entry["path"] == root.as_posix() + "/" + module_id
+                  assert entry["repo"] == repo
+                  folder = root / module_id
+                  manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+                  assert (folder / "main.js").is_file()
+                  assert (folder / "UPSTREAM.json").is_file()
+                  assert manifest.get("id") == module_id
+                  for key in ("id", "name", "version", "runtime", "api", "hosts", "capabilities"):
+                      if key in manifest:
+                          assert entry.get(key) == manifest[key], f"{module_id}: mismatch {key}"
+          standard_dirs = {p.name for p in Path("modules").iterdir() if p.is_dir()}
+          adult_dirs = {p.name for p in Path("modules-adult").iterdir() if p.is_dir()}
+          assert standard_dirs == catalog_ids["index.json"], "普通目录与 index.json 不一致"
+          assert adult_dirs == catalog_ids["adult-index.json"], "限制级目录与 adult-index.json 不一致"
+          log = json.loads(Path("new-modules.json").read_text(encoding="utf-8"))
+          assert log.get("schemaVersion") == 1 and isinstance(log.get("modules"), list)
+          recorded = set()
+          for item in log["modules"]:
+              module_id = item.get("id")
+              assert module_id and module_id not in recorded, f"新增记录 ID 缺失或重复：{item}"
+              recorded.add(module_id)
+              assert item.get("name") and item.get("importedAt") and item.get("upstream")
+              status = item.get("reviewStatus")
+              assert status in ("pending", "promoted-to-standard"), f"未知核查状态：{item}"
+              if status == "pending":
+                  assert module_id in catalog_ids["adult-index.json"], f"待核查模块不在限制级索引：{module_id}"
+              else:
+                  assert module_id in catalog_ids["index.json"], f"已转普通模块未登记普通索引：{module_id}"
+          print(f"校验通过：普通模块 {len(standard_dirs)} 个，限制级模块 {len(adult_dirs)} 个，新增核查记录 {len(recorded)} 条。")
+          PY
