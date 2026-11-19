@@ -93,13 +93,9 @@ jobs:
                   "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
                   "path": f"{'modules' if category == 'standard' else 'modules-all'}/{module_id}"
               }
-              # adult 仅作为兼容性元数据；实际分类由目录和索引决定。
-              if "adult" in old:
-                  entry["adult"] = old["adult"]
-              elif category == "adult":
-                  entry["adult"] = True
-              else:
-                  entry["adult"] = False
+              # adult 元数据完全沿用上游 manifest；上游未提供时不添加。
+              if "adult" in manifest:
+                  entry["adult"] = manifest["adult"]
               return entry
 
           def write_json(path, data):
