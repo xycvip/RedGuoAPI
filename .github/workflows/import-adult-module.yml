@@ -201,7 +201,7 @@ jobs:
                           "files": hashes,
                           "importMethod": "source-copy"
                       }
-                      upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\\n"
+                      upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\n"
                       changed_any = False
 
                       # 两种分发形态分别同步：存在于哪个目录/索引，就更新哪个。
