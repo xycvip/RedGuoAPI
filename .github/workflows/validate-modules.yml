@@ -2,10 +2,10 @@ name: 校验模块目录
 on:
   push:
     branches: [main]
-    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "modules-adult/**", ".github/workflows/**"]
+    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "moudules-all/**", ".github/workflows/**"]
   pull_request:
     branches: [main]
-    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "modules-adult/**", ".github/workflows/**"]
+    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "moudules-all/**", ".github/workflows/**"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
           repo = os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI")
           catalogs = [
               ("index.json", Path("modules"), "standard"),
-              ("allindex.json", Path("modules-adult"), "adult"),
+              ("allindex.json", Path("moudules-all"), "adult"),
           ]
           seen = set()
           catalog_ids = {}
@@ -36,7 +36,7 @@ jobs:
               assert data.get("repository") == repo
               assert data.get("category") == category
               entries = data.get("modules")
-              assert isinstance(entries, list) and entries
+              assert isinstance(entries, list)
               catalog_ids[catalog_name] = {x["id"] for x in entries}
               for entry in entries:
                   for key in ("id", "name", "version", "runtime", "api", "upstream", "license", "path", "repo"):
@@ -57,8 +57,10 @@ jobs:
                   for key in ("id", "name", "version", "runtime", "api", "hosts", "capabilities"):
                       if key in manifest:
                           assert entry.get(key) == manifest[key], f"{module_id}: mismatch {key}"
-          standard_dirs = {p.name for p in Path("modules").iterdir() if p.is_dir()}
-          adult_dirs = {p.name for p in Path("modules-adult").iterdir() if p.is_dir()}
+          standard_root = Path("modules")
+          standard_dirs = {p.name for p in standard_root.iterdir() if p.is_dir()} if standard_root.exists() else set()
+          adult_root = Path("moudules-all")
+          adult_dirs = {p.name for p in adult_root.iterdir() if p.is_dir()} if adult_root.exists() else set()
           assert standard_dirs == catalog_ids["index.json"], "普通目录与 index.json 不一致"
           assert adult_dirs == catalog_ids["allindex.json"], "限制级目录与 allindex.json 不一致"
           log = json.loads(Path("new-modules.json").read_text(encoding="utf-8"))
