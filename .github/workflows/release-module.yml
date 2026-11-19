@@ -1,0 +1,245 @@
+name: 模块自动发布
+
+on:
+  workflow_run:
+    workflows: ["上游模块自动同步"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "modules-adult/**"
+      - "index.json"
+      - "adult-index.json"
+  workflow_dispatch:
+    inputs:
+      module_id:
+        description: 可选：填写模块 ID 只发布该模块；留空则全量检查并发布所有模块
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: module-auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 识别需要发布的模块
+        id: candidates
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.event.after }}
+          MODULE_ID: ${{ inputs.module_id }}
+        run: |
+          python - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+
+          event = os.environ["EVENT_NAME"]
+          selected = set()
+          if event == "push":
+              before, after = os.environ.get("BEFORE_SHA", ""), os.environ.get("AFTER_SHA", "")
+              if before and after and not set(before) == {"0"}:
+                  changed = subprocess.check_output(
+                      ["git", "diff", "--name-only", before, after], text=True
+                  ).splitlines()
+                  for path in changed:
+                      m = re.match(r"^(?:modules|modules-adult)/([^/]+)/", path)
+                      if m:
+                          selected.add(m.group(1))
+                      elif path == "index.json":
+                          data = json.loads(Path("index.json").read_text(encoding="utf-8"))
+                          selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
+                      elif path == "adult-index.json":
+                          data = json.loads(Path("adult-index.json").read_text(encoding="utf-8"))
+                          selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
+          elif event == "workflow_dispatch":
+              requested = os.environ.get("MODULE_ID", "").strip()
+              if requested:
+                  selected.add(requested)
+              else:
+                  # 手动运行且未填写模块 ID：扫描两个索引中的全部模块
+                  for catalog_path in (Path("index.json"), Path("adult-index.json")):
+                      if catalog_path.exists():
+                          data = json.loads(catalog_path.read_text(encoding="utf-8"))
+                          selected.update(
+                              entry.get("id", "") for entry in data.get("modules", [])
+                              if isinstance(entry, dict)
+                          )
+          else:
+              # 上游自动同步完成后：只处理本轮新增或更新的模块
+              log_path = Path("sync-log.json")
+              if log_path.exists():
+                  log = json.loads(log_path.read_text(encoding="utf-8"))
+                  runs = log.get("runs", [])
+                  if runs:
+                      latest = runs[-1]
+                      selected.update(latest.get("added", []))
+                      selected.update(latest.get("updated", []))
+
+          selected = sorted(x for x in selected if re.fullmatch(r"[a-z0-9][a-z0-9-]*", x))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("modules=" + ",".join(selected) + "\n")
+          print("待检查模块：" + (", ".join(selected) if selected else "无"))
+          PY
+
+      - name: 发布有新版本的模块
+        if: steps.candidates.outputs.modules != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULES: ${{ steps.candidates.outputs.modules }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, re, subprocess, zipfile
+          from urllib.parse import quote
+          from datetime import date
+          from pathlib import Path
+
+          repository = os.environ["REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          modules = [x for x in os.environ["MODULES"].split(",") if x]
+          catalogs = [
+              (Path("index.json"), Path("modules")),
+              (Path("adult-index.json"), Path("modules-adult")),
+          ]
+          changed_catalogs = set()
+
+          def gh(*args, check=True):
+              return subprocess.run(["gh", *args], text=True, capture_output=True, check=check)
+
+          for module_id in modules:
+              try:
+                  found = None
+                  for catalog_path, root in catalogs:
+                      data = json.loads(catalog_path.read_text(encoding="utf-8"))
+                      entry = next((x for x in data.get("modules", []) if x.get("id") == module_id), None)
+                      if entry:
+                          found = (catalog_path, root, data, entry)
+                          break
+                  if not found:
+                      print(f"[SKIP] {module_id}: 两个索引中均不存在")
+                      continue
+
+                  catalog_path, root, data, entry = found
+                  folder = root / module_id
+                  manifest_path, main_path = folder / "manifest.json", folder / "main.js"
+                  if not manifest_path.is_file() or not main_path.is_file():
+                      print(f"[SKIP] {module_id}: 缺少 manifest.json 或 main.js")
+                      continue
+
+                  manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                  version = manifest.get("version")
+                  module_name = str(manifest.get("name") or module_id).strip()
+                  if manifest.get("id") != module_id or not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+                      print(f"[SKIP] {module_id}: manifest ID 或 x.y.z 版本号无效")
+                      continue
+                  manifest_bytes, main_bytes = manifest_path.read_bytes(), main_path.read_bytes()
+                  hashes = {
+                      "manifest.json": hashlib.sha256(manifest_bytes).hexdigest(),
+                      "main.js": hashlib.sha256(main_bytes).hexdigest(),
+                  }
+                  old_hashes = entry.get("sha256", {})
+                  old_release = entry.get("releaseTag", entry.get("tag", ""))
+
+                  if old_release and old_hashes == hashes and entry.get("assetName") and entry.get("assetUrl") and entry.get("tag"):
+                      print(f"[UNCHANGED] {module_id} {version}: 文件指纹未变化")
+                      continue
+
+                  tag = f"{module_id}-v{version}"
+                  if old_release == tag:
+                      print(f"[VERSION-NOT-BUMPED] {module_id}: 源码已变化，但 manifest.version 仍为 {version}；请上游提升版本号后再发布")
+                      continue
+
+                  existing = gh("release", "view", tag, check=False)
+                  if existing.returncode == 0:
+                      # Release 已存在时不重复上传；改为核对附件并补齐索引元数据。
+                      release_info = gh("api", f"repos/{repository}/releases/tags/{tag}")
+                      release_data = json.loads(release_info.stdout)
+                      asset_filename = f"{module_id}-{version}.zip"
+                      asset = next((a for a in release_data.get("assets", []) if a.get("name") == asset_filename), None)
+                      if not asset:
+                          print(f"[ERROR] {module_id}: Release {tag} 已存在，但缺少附件 {asset_filename}，未覆盖原 Release")
+                          continue
+                      entry["version"] = version
+                      entry["tag"] = tag
+                      entry["releaseTag"] = tag
+                      entry["repo"] = repository
+                      entry["path"] = f"{root.as_posix()}/{module_id}"
+                      entry["sha256"] = hashes
+                      entry["assetName"] = asset_filename
+                      entry["assetUrl"] = asset.get("browser_download_url") or f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
+                      data["generatedAt"] = date.today().isoformat()
+                      catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                      changed_catalogs.add(catalog_path)
+                      print(f"[REPAIRED] {module_id} {version}: 已存在 Release 的索引下载信息与 SHA256 已补齐")
+                      continue
+
+                  # 先用 ASCII 临时名上传，再通过 Release Asset API 设置模块 ID+版本号附件名。
+                  archive = Path(f"{module_id}-{version}.zip")
+                  asset_filename = f"{module_id}-{version}.zip"
+                  with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
+                      z.write(manifest_path, "manifest.json")
+                      z.write(main_path, "main.js")
+
+                  notes = f"模块：{module_name}\n版本：{version}\n\n由 RedGuoAPI 自动检测上游更新并发布。ZIP 仅包含 manifest.json 和 main.js。"
+                  result = gh("release", "create", tag, str(archive), "--title", f"{module_name} v{version}", "--notes", notes)
+                  if result.returncode != 0:
+                      print(f"[ERROR] {module_id}: 发布失败：{result.stderr.strip()}")
+                      continue
+
+                  # CLI 使用 ASCII 临时名上传，再用 GitHub API 改为模块 ID+版本号并验证。
+                  release_info = gh("api", f"repos/{repository}/releases/tags/{tag}")
+                  release_data = json.loads(release_info.stdout)
+                  uploaded = next((a for a in release_data.get("assets", []) if a.get("name") == archive.name), None)
+                  if not uploaded:
+                      print(f"[ERROR] {module_id}: Release 已创建，但找不到刚上传的 ZIP 附件")
+                      continue
+                  patch = gh("api", "--method", "PATCH", f"repos/{repository}/releases/assets/{uploaded['id']}", "-f", f"name={asset_filename}", check=False)
+                  if patch.returncode != 0:
+                      print(f"[ERROR] {module_id}: Release 已创建，但附件改名失败：{patch.stderr.strip()}")
+                      continue
+                  patched = json.loads(patch.stdout)
+                  if patched.get("name") != asset_filename:
+                      print(f"[ERROR] {module_id}: 附件名验证失败，实际为 {patched.get('name')}")
+                      continue
+
+                  entry["version"] = version
+                  entry["tag"] = tag
+                  entry["releaseTag"] = tag
+                  entry["repo"] = repository
+                  entry["path"] = f"{root.as_posix()}/{module_id}"
+                  entry["sha256"] = hashes
+                  entry["assetName"] = asset_filename
+                  entry["assetUrl"] = f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
+                  data["generatedAt"] = date.today().isoformat()
+                  catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                  changed_catalogs.add(catalog_path)
+                  print(f"[PUBLISHED] {module_id} {version} -> {tag}")
+              except Exception as exc:
+                  print(f"[ERROR] {module_id}: {type(exc).__name__}: {exc}")
+
+          if changed_catalogs:
+              subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+              subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
+              subprocess.run(["git", "add", "index.json", "adult-index.json"], check=True)
+              diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
+              if diff.returncode != 0:
+                  subprocess.run(["git", "commit", "-m", "chore(release): 自动更新模块发布索引"], check=True)
+                  subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
+          print("模块自动发布检查完成。")
+          PY
