@@ -4,15 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       preview_only:
-        description: 仅预览恢复结果；取消勾选后才会写入仓库
+        description: 仅预览补全结果；取消勾选后才会补写缺失数据
         required: true
         type: boolean
         default: true
-      overwrite_existing:
-        description: 目标文件已存在时允许覆盖（默认禁止）
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -26,114 +21,188 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: 检出仓库及历史记录
+      - name: 检出仓库
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: 从清空前提交恢复索引元数据
+      - name: 核查并仅补全缺失数据
         env:
           PREVIEW_ONLY: ${{ inputs.preview_only }}
-          OVERWRITE_EXISTING: ${{ inputs.overwrite_existing }}
         run: |
           python - <<'PY'
           import json
           import os
-          import subprocess
+          import re
+          import shutil
           from pathlib import Path
 
-          SOURCE_COMMIT = "eb9241a6ae770f87bf0f4b965d6ed6edc21b4110"
-          FILES = (
-              "index.json",
-              "allindex.json",
-              "new-modules.json",
-              "sync-log.json",
-          )
           preview_only = os.environ.get("PREVIEW_ONLY", "true").lower() == "true"
-          overwrite = os.environ.get("OVERWRITE_EXISTING", "false").lower() == "true"
+          standard_file = Path("index.json")
+          full_file = Path("allindex.json")
+          standard_root = Path("modules")
+          full_root = Path("modules-all")
 
-          def git_show(path):
-              result = subprocess.run(
-                  ["git", "show", f"{SOURCE_COMMIT}:{path}"],
-                  text=True, capture_output=True
-              )
-              if result.returncode != 0:
-                  raise RuntimeError(f"历史提交中找不到 {path}: {result.stderr.strip()}")
-              return result.stdout
+          # 只同步发布元数据；不复制 adult、版本基础信息或其他已有字段。
+          metadata_keys = ("tag", "releaseTag", "sha256", "assetName", "assetUrl")
+          required_files = ("manifest.json", "main.js", "UPSTREAM.json")
 
-          restored = {}
-          for filename in FILES:
-              raw = git_show(filename)
-              data = json.loads(raw)
+          def load_json(path):
+              if not path.is_file():
+                  raise RuntimeError(f"必要文件不存在：{path}")
+              return json.loads(path.read_text(encoding="utf-8"))
 
-              if filename in ("index.json", "allindex.json"):
-                  modules = data.get("modules")
-                  if not isinstance(modules, list):
-                      raise ValueError(f"{filename}: modules 必须是数组")
+          standard = load_json(standard_file)
+          full = load_json(full_file)
 
-                  seen = set()
-                  expected_root = "modules" if filename == "index.json" else "modules-all"
-                  for entry in modules:
-                      if not isinstance(entry, dict):
-                          raise ValueError(f"{filename}: 存在非对象模块条目")
-                      module_id = entry.get("id")
-                      if not isinstance(module_id, str) or not module_id:
-                          raise ValueError(f"{filename}: 存在无效模块 ID")
-                      if module_id in seen:
-                          raise ValueError(f"{filename}: 模块 ID 重复：{module_id}")
-                      seen.add(module_id)
+          if not isinstance(standard.get("modules"), list):
+              raise RuntimeError("index.json 的 modules 必须是数组")
+          if not isinstance(full.get("modules"), list):
+              raise RuntimeError("allindex.json 的 modules 必须是数组")
 
-                      if filename == "allindex.json":
-                          old_path = entry.get("path", "")
-                          if old_path.startswith("moudules-all/"):
-                              entry["path"] = old_path.replace("moudules-all/", "modules-all/", 1)
-                          elif not old_path:
-                              entry["path"] = f"{expected_root}/{module_id}"
-                      elif not entry.get("path"):
-                          entry["path"] = f"{expected_root}/{module_id}"
+          def index_by_id(data, filename):
+              result = {}
+              for entry in data["modules"]:
+                  if not isinstance(entry, dict):
+                      raise RuntimeError(f"{filename} 存在非对象模块条目")
+                  module_id = entry.get("id")
+                  if not isinstance(module_id, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", module_id) or module_id in (".", ".."):
+                      raise RuntimeError(f"{filename} 存在无效模块 ID：{module_id!r}")
+                  if module_id in result:
+                      raise RuntimeError(f"{filename} 模块 ID 重复：{module_id}")
+                  result[module_id] = entry
+              return result
 
-                  print(f"[CHECK] {filename}: {len(modules)} 个模块，ID 无重复")
-              elif not isinstance(data, dict):
-                  raise ValueError(f"{filename}: JSON 根节点必须是对象")
+          standard_map = index_by_id(standard, "index.json")
+          full_map = index_by_id(full, "allindex.json")
 
-              restored[filename] = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-
-          existing = [name for name in FILES if Path(name).exists()]
-          if existing and not overwrite:
-              raise SystemExit(
-                  "目标文件已存在，已停止以保护现有数据："
-                  + ", ".join(existing)
-                  + "。如确认覆盖，请重新运行并勾选 overwrite_existing。"
+          missing_from_full = sorted(set(standard_map) - set(full_map))
+          if missing_from_full:
+              raise RuntimeError(
+                  "精简索引中的模块在全量索引中不存在，停止操作，不做猜测："
+                  + ", ".join(missing_from_full)
               )
 
-          print("\n===== 恢复预览 =====")
-          print(f"来源提交：{SOURCE_COMMIT}")
-          print(f"恢复文件：{', '.join(FILES)}")
-          print(f"精简模块数：{len(json.loads(restored['index.json'])['modules'])}")
-          print(f"全量模块数：{len(json.loads(restored['allindex.json'])['modules'])}")
-          print("全量目录路径：moudules-all/ -> modules-all/")
-          print("SHA256、版本号、Tag、Release 地址及 adult 字段均保留历史值。")
+          # 所有来源先完成预检；任何一个全量源不完整，都不开始写入。
+          source_dirs = {}
+          for module_id in sorted(standard_map):
+              full_entry = full_map[module_id]
+              expected_source = f"modules-all/{module_id}"
+              if full_entry.get("path") != expected_source:
+                  raise RuntimeError(
+                      f"{module_id}: 全量索引 path 不匹配，预期 {expected_source}，"
+                      f"实际 {full_entry.get('path')!r}"
+                  )
+              source_dir = full_root / module_id
+              if not source_dir.is_dir():
+                  raise RuntimeError(f"{module_id}: 全量来源目录不存在：{source_dir}")
+              for filename in required_files:
+                  if not (source_dir / filename).is_file():
+                      raise RuntimeError(f"{module_id}: 全量来源缺少必需文件：{source_dir / filename}")
+              source_dirs[module_id] = source_dir
+
+              target_path = standard_map[module_id].get("path")
+              expected_target = f"modules/{module_id}"
+              if target_path != expected_target:
+                  raise RuntimeError(
+                      f"{module_id}: 精简索引 path 不匹配，预期 {expected_target}，"
+                      f"实际 {target_path!r}"
+                  )
+
+          metadata_additions = []
+          file_additions = []
+
+          # 只对精简索引条目中完全不存在的发布元数据字段补值。
+          for module_id in sorted(standard_map):
+              target_entry = standard_map[module_id]
+              source_entry = full_map[module_id]
+              for key in metadata_keys:
+                  if key not in target_entry and key in source_entry:
+                      target_entry[key] = source_entry[key]
+                      metadata_additions.append(f"{module_id}.{key}")
+
+          # 从全量目录逐文件补缺：目标已存在的文件绝不覆盖。
+          for module_id in sorted(standard_map):
+              source_dir = source_dirs[module_id]
+              target_dir = standard_root / module_id
+
+              if os.path.lexists(target_dir) and not target_dir.is_dir():
+                  raise RuntimeError(f"目标路径类型冲突，拒绝覆盖：{target_dir}")
+
+              for source in sorted(source_dir.rglob("*")):
+                  if source.is_dir():
+                      continue
+                  if source.is_symlink():
+                      raise RuntimeError(f"全量来源包含符号链接，拒绝复制：{source}")
+                  relative = source.relative_to(source_dir)
+                  target = target_dir / relative
+
+                  if os.path.lexists(target):
+                      if target.is_dir():
+                          raise RuntimeError(f"目标文件路径已被目录占用，拒绝覆盖：{target}")
+                      continue
+
+                  file_additions.append((source, target))
+
+          print("===== 核查与补全预览 =====")
+          print(f"精简模块：{len(standard_map)} 个")
+          print(f"全量模块：{len(full_map)} 个")
+          print(f"待补发布元数据字段：{len(metadata_additions)} 项")
+          for item in metadata_additions:
+              print(f"  [补字段] {item}")
+          print(f"待补文件：{len(file_additions)} 个")
+          for source, target in file_additions:
+              print(f"  [补文件] {source} -> {target}")
+          print("保护规则：不覆盖任何已有字段或文件；不修改 allindex.json。")
+          print("不修改 adult、版本基础信息、Tag/Release、上游文件及其他辅助文件。")
 
           if preview_only:
-              print("\n[PREVIEW] 当前为预览模式，没有写入或提交任何文件。")
+              print("[PREVIEW] 预览结束，未写入任何文件。")
               raise SystemExit(0)
 
-          for filename, content in restored.items():
-              Path(filename).write_text(content, encoding="utf-8")
+          # 只在确有缺失字段时写 index.json；不触碰 allindex.json。
+          if metadata_additions:
+              standard_file.write_text(
+                  json.dumps(standard, ensure_ascii=False, indent=2) + "\n",
+                  encoding="utf-8"
+              )
 
-          print("\n[RESTORED] 四份索引/辅助元数据文件已写入，准备提交。")
+          copied = 0
+          for source, target in file_additions:
+              target.parent.mkdir(parents=True, exist_ok=True)
+              # 再次检查，确保不会因目标已存在而覆盖。
+              if os.path.lexists(target):
+                  continue
+              shutil.copy2(source, target)
+              copied += 1
+
+          # 写入后检查所有精简模块必需文件及已补元数据。
+          for module_id in sorted(standard_map):
+              target_dir = standard_root / module_id
+              for filename in required_files:
+                  if not (target_dir / filename).is_file():
+                      raise RuntimeError(f"补全后仍缺少必需文件：{target_dir / filename}")
+              target_entry = standard_map[module_id]
+              source_entry = full_map[module_id]
+              for key in metadata_keys:
+                  if key in source_entry and key not in target_entry:
+                      raise RuntimeError(f"补全后仍缺少元数据：{module_id}.{key}")
+
+          print(f"[DONE] 新增元数据字段 {len(metadata_additions)} 项，复制缺失文件 {copied} 个。")
+          if not metadata_additions and copied == 0:
+              print("[NO-OP] 没有缺失数据，无需提交。")
           PY
 
-      - name: 提交恢复结果
+      - name: 仅提交补全文件
         if: ${{ !inputs.preview_only }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- index.json allindex.json new-modules.json sync-log.json
+          git add -- index.json modules/
           if git diff --cached --quiet; then
-            echo "恢复内容与当前仓库一致，无需提交。"
+            echo "没有缺失数据需要补全，不创建提交。"
             exit 0
           fi
-          git commit -m "restore: 恢复清空前的索引元数据"
+          git commit -m "restore: 仅补全缺失的索引元数据和模块文件"
           git push origin HEAD:main
