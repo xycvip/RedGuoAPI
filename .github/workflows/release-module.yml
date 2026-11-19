@@ -8,7 +8,7 @@ on:
     branches: [main]
     paths:
       - "modules/**"
-      - "modules-adult/**"
+      - "moudules-all/**"
       - "index.json"
       - "allindex.json"
   workflow_dispatch:
@@ -58,7 +58,7 @@ jobs:
                       ["git", "diff", "--name-only", before, after], text=True
                   ).splitlines()
                   for path in changed:
-                      m = re.match(r"^(?:modules|modules-adult)/([^/]+)/", path)
+                      m = re.match(r"^(?:modules|moudules-all)/([^/]+)/", path)
                       if m:
                           selected.add(m.group(1))
                       elif path == "index.json":
@@ -115,7 +115,7 @@ jobs:
           modules = [x for x in os.environ["MODULES"].split(",") if x]
           catalogs = [
               (Path("index.json"), Path("modules")),
-              (Path("allindex.json"), Path("modules-adult")),
+              (Path("allindex.json"), Path("moudules-all")),
           ]
           changed_catalogs = set()
 
