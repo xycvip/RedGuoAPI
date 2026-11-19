@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "moudules-all/**"
+      - "modules-all/**"
       - "allindex.json"
   workflow_dispatch:
     inputs:
@@ -56,7 +56,7 @@ jobs:
                       ["git", "diff", "--name-only", before, after], text=True
                   ).splitlines()
                   for path in changed:
-                      m = re.match(r"^moudules-all/([^/]+)/", path)
+                      m = re.match(r"^modules-all/([^/]+)/", path)
                       if m:
                           selected.add(m.group(1))
                       elif path == "allindex.json":
@@ -86,7 +86,7 @@ jobs:
                       selected.update(latest.get("added", []))
                       selected.update(latest.get("updated", []))
 
-          # 最终白名单：必须同时存在于 allindex.json 和 moudules-all/<ID>/
+          # 最终白名单：必须同时存在于 allindex.json 和 modules-all/<ID>/
           catalog_path = Path("allindex.json")
           allowed = set()
           if catalog_path.exists():
@@ -99,7 +99,7 @@ jobs:
               x for x in selected
               if re.fullmatch(r"[a-z0-9][a-z0-9-]*", x)
               and x in allowed
-              and (Path("moudules-all") / x).is_dir()
+              and (Path("modules-all") / x).is_dir()
           )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("modules=" + ",".join(selected) + "\n")
@@ -123,7 +123,7 @@ jobs:
           token = os.environ["GH_TOKEN"]
           modules = [x for x in os.environ["MODULES"].split(",") if x]
           catalogs = [
-              (Path("allindex.json"), Path("moudules-all")),
+              (Path("allindex.json"), Path("modules-all")),
           ]
           changed_catalogs = set()
 

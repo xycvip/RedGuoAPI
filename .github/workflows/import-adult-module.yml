@@ -91,7 +91,7 @@ jobs:
                   "sourceImport": "imported",
                   "license": old.get("license", "not-declared"),
                   "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
-                  "path": f"{'modules' if category == 'standard' else 'moudules-all'}/{module_id}"
+                  "path": f"{'modules' if category == 'standard' else 'modules-all'}/{module_id}"
               }
               # adult 仅作为兼容性元数据；实际分类由目录和索引决定。
               if "adult" in old:
@@ -107,7 +107,7 @@ jobs:
 
           sync_log = {"schemaVersion": 1, "runs": []}
           Path("modules").mkdir(parents=True, exist_ok=True)
-          Path("moudules-all").mkdir(parents=True, exist_ok=True)
+          Path("modules-all").mkdir(parents=True, exist_ok=True)
           try:
               # 新仓库首次运行时初始化空索引，不要求迁移旧仓库模块数据。
               standard_path = Path("index.json")
@@ -173,7 +173,7 @@ jobs:
                       summary["moduleRepositories"] += 1
 
                       standard_target = Path("modules") / module_id
-                      adult_target = Path("moudules-all") / module_id
+                      adult_target = Path("modules-all") / module_id
                       standard_exists = (
                           any(x["id"] == module_id for x in standard["modules"])
                           or standard_target.exists()
@@ -206,7 +206,7 @@ jobs:
 
                       # 两种分发形态分别同步：存在于哪个目录/索引，就更新哪个。
                       for category in categories:
-                          root = Path("modules" if category == "standard" else "moudules-all")
+                          root = Path("modules" if category == "standard" else "modules-all")
                           target = root / module_id
                           target.mkdir(parents=True, exist_ok=True)
                           changed = False
@@ -277,7 +277,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- index.json allindex.json new-modules.json sync-log.json modules moudules-all
+          git add -A -- index.json allindex.json new-modules.json sync-log.json modules modules-all
           if git diff --cached --quiet; then
             echo "没有文件变化，无需提交。"
             exit 0

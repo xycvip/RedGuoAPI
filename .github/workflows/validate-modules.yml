@@ -2,10 +2,10 @@ name: 校验模块目录
 on:
   push:
     branches: [main]
-    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "moudules-all/**", ".github/workflows/**"]
+    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "modules-all/**", ".github/workflows/**"]
   pull_request:
     branches: [main]
-    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "moudules-all/**", ".github/workflows/**"]
+    paths: ["index.json", "allindex.json", "new-modules.json", "modules/**", "modules-all/**", ".github/workflows/**"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
           repo = os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI")
           catalogs = [
               ("index.json", Path("modules"), "standard"),
-              ("allindex.json", Path("moudules-all"), "adult"),
+              ("allindex.json", Path("modules-all"), "adult"),
           ]
           catalog_ids = {}
           for catalog_name, root, category in catalogs:
@@ -59,7 +59,7 @@ jobs:
                           assert entry.get(key) == manifest[key], f"{module_id}: mismatch {key}"
           standard_root = Path("modules")
           standard_dirs = {p.name for p in standard_root.iterdir() if p.is_dir()} if standard_root.exists() else set()
-          adult_root = Path("moudules-all")
+          adult_root = Path("modules-all")
           adult_dirs = {p.name for p in adult_root.iterdir() if p.is_dir()} if adult_root.exists() else set()
           assert standard_dirs == catalog_ids["index.json"], "普通目录与 index.json 不一致"
           assert adult_dirs == catalog_ids["allindex.json"], "限制级目录与 allindex.json 不一致"
@@ -78,7 +78,7 @@ jobs:
               else:
                   assert module_id in catalog_ids["allindex.json"], f"已核查模块的限制级原件不在 allindex.json：{module_id}"
                   assert module_id in catalog_ids["index.json"], f"已核查模块的普通副本未登记 index.json：{module_id}"
-                  assert (Path("moudules-all") / module_id).is_dir(), f"已核查模块的限制级原件目录缺失：{module_id}"
+                  assert (Path("modules-all") / module_id).is_dir(), f"已核查模块的限制级原件目录缺失：{module_id}"
                   assert (Path("modules") / module_id).is_dir(), f"已核查模块的普通副本目录缺失：{module_id}"
           print(f"校验通过：普通模块 {len(standard_dirs)} 个，限制级模块 {len(adult_dirs)} 个，新增核查记录 {len(recorded)} 条。")
           PY
