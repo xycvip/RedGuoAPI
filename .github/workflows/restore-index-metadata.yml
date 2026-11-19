@@ -211,16 +211,16 @@ jobs:
                   close_indent = prefix[len(trimmed):]
                   if "\n" not in prefix:
                       raise RuntimeError(f"{module_id}: JSON 对象不是多行格式，拒绝执行不安全补丁")
-              indent_match = re.search(r'\n([ \t]+)"', prefix)
-              if not indent_match:
-                  raise RuntimeError(f"{module_id}: 无法识别 JSON 字段缩进")
-              property_indent = indent_match.group(1)
+                  indent_match = re.search(r'\n([ \t]+)"', prefix)
+                  if not indent_match:
+                      raise RuntimeError(f"{module_id}: 无法识别 JSON 字段缩进")
+                  property_indent = indent_match.group(1)
                   new_lines = [
                       property_indent + json.dumps(key, ensure_ascii=False) + ": " +
                       json.dumps(value, ensure_ascii=False, separators=(",", ":"))
                       for key, value in fields.items()
                   ]
-              replacement = trimmed + ",\n" + ",\n".join(new_lines) + "\n" + close_indent + "}"
+                  replacement = trimmed + ",\n" + ",\n".join(new_lines) + "\n" + close_indent + "}"
                   replacements.append((start, end, replacement))
 
               patched = original_text
