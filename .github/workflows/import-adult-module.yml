@@ -1,0 +1,247 @@
+name: 上游模块自动同步
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-module-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: 检出本仓库
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 扫描上游并同步模块
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          ORG = "guoapp-modules"
+          TOKEN = os.environ.get("GH_TOKEN", "")
+          HEADERS = {
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "HongGuoModules-AutoSync"
+          }
+          if TOKEN:
+              HEADERS["Authorization"] = f"Bearer {TOKEN}"
+
+          now = datetime.now(timezone.utc)
+          stamp = now.isoformat(timespec="seconds").replace("+00:00", "Z")
+          today = now.date().isoformat()
+          summary = {
+              "runAt": stamp, "status": "completed",
+              "scannedRepositories": 0, "moduleRepositories": 0,
+              "added": [], "updated": [], "unchanged": [],
+              "skipped": [], "failed": [], "fatalErrors": []
+          }
+
+          def request(url, raw=False):
+              req = urllib.request.Request(url, headers=HEADERS)
+              with urllib.request.urlopen(req, timeout=25) as response:
+                  return response.read() if raw else json.loads(response.read().decode("utf-8"))
+
+          def api(url):
+              return request("https://api.github.com" + url)
+
+          def raw_file(repo, branch, filename):
+              url = f"https://raw.githubusercontent.com/{ORG}/{repo}/{branch}/{filename}"
+              return request(url, raw=True)
+
+          def digest(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def make_entry(module_id, manifest, category, branch):
+              old = entry_map.get(module_id, {})
+              entry = {
+                  "id": module_id,
+                  "name": manifest["name"],
+                  "version": manifest["version"],
+                  "runtime": manifest["runtime"],
+                  "api": manifest["api"],
+                  "hosts": manifest.get("hosts", []),
+                  "capabilities": manifest.get("capabilities", []),
+                  "aliases": manifest.get("aliases", []),
+                  "baseUrl": manifest.get("baseUrl", ""),
+                  "allowEmptyCatalog": manifest.get("allowEmptyCatalog", False),
+                  "upstream": f"https://github.com/{ORG}/{module_id}",
+                  "upstreamRef": branch,
+                  "sourceImport": "imported",
+                  "license": old.get("license", "not-declared"),
+                  "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
+                  "path": f"{'modules' if category == 'standard' else 'modules-adult'}/{module_id}"
+              }
+              # adult 仅作为兼容性元数据；实际分类由目录和索引决定。
+              if "adult" in old:
+                  entry["adult"] = old["adult"]
+              elif category == "adult":
+                  entry["adult"] = True
+              else:
+                  entry["adult"] = False
+              return entry
+
+          def write_json(path, data):
+              Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+          sync_log = {"schemaVersion": 1, "runs": []}
+          try:
+              standard = json.loads(Path("index.json").read_text(encoding="utf-8"))
+              adult = json.loads(Path("adult-index.json").read_text(encoding="utf-8"))
+              new_log = json.loads(Path("new-modules.json").read_text(encoding="utf-8"))
+              sync_log_path = Path("sync-log.json")
+              if sync_log_path.exists():
+                  sync_log = json.loads(sync_log_path.read_text(encoding="utf-8"))
+              entry_map = {x["id"]: x for x in standard["modules"] + adult["modules"]}
+              location_map = {
+                  x["id"]: ("standard" if x in standard["modules"] else "adult")
+                  for x in standard["modules"] + adult["modules"]
+              }
+              excluded = {"index", "template", ".github"}
+              page = 1
+              repositories = []
+              while True:
+                  batch = api(f"/orgs/{ORG}/repos?per_page=100&page={page}&type=public")
+                  if not batch:
+                      break
+                  repositories.extend(batch)
+                  if len(batch) < 100:
+                      break
+                  page += 1
+
+              summary["scannedRepositories"] = len(repositories)
+              for repo_info in repositories:
+                  module_id = repo_info.get("name", "")
+                  if (module_id in excluded or repo_info.get("archived")
+                          or repo_info.get("fork") or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", module_id)):
+                      summary["skipped"].append({"id": module_id, "reason": "非模块候选仓库"})
+                      continue
+                  branch = repo_info.get("default_branch") or "main"
+                  try:
+                      try:
+                          manifest_bytes = raw_file(module_id, branch, "manifest.json")
+                      except urllib.error.HTTPError as exc:
+                          if exc.code == 404:
+                              summary["skipped"].append({"id": module_id, "reason": "没有 manifest.json"})
+                              continue
+                          raise
+                      manifest = json.loads(manifest_bytes.decode("utf-8"))
+                      if (manifest.get("id") != module_id or not manifest.get("name")
+                              or not manifest.get("version") or manifest.get("runtime") != "js"
+                              or manifest.get("api") != 1):
+                          summary["skipped"].append({"id": module_id, "reason": "manifest 不符合模块规范"})
+                          continue
+                      main_bytes = raw_file(module_id, branch, "main.js")
+                      commit_info = api(f"/repos/{ORG}/{module_id}/commits/{branch}")
+                      commit_sha = commit_info["sha"]
+                      summary["moduleRepositories"] += 1
+
+                      category = location_map.get(module_id)
+                      is_new = category is None
+                      if is_new:
+                          category = "adult"
+                      root = Path("modules" if category == "standard" else "modules-adult")
+                      target = root / module_id
+                      target.mkdir(parents=True, exist_ok=True)
+                      files = {"manifest.json": manifest_bytes, "main.js": main_bytes}
+                      changed = is_new
+                      for filename, content in files.items():
+                          destination = target / filename
+                          if not destination.exists() or destination.read_bytes() != content:
+                              destination.write_bytes(content)
+                              changed = True
+                      hashes = {name: digest(content) for name, content in files.items()}
+                      upstream_record = {
+                          "repository": f"{ORG}/{module_id}",
+                          "ref": branch,
+                          "sourceTreeSha": commit_sha,
+                          "files": hashes,
+                          "importMethod": "source-copy"
+                      }
+                      upstream_path = target / "UPSTREAM.json"
+                      upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\n"
+                      if not upstream_path.exists() or upstream_path.read_text(encoding="utf-8") != upstream_text:
+                          upstream_path.write_text(upstream_text, encoding="utf-8")
+                          changed = True
+
+                      entry = make_entry(module_id, manifest, category, branch)
+                      catalog = standard if category == "standard" else adult
+                      old_entry = next((x for x in catalog["modules"] if x["id"] == module_id), None)
+                      if old_entry != entry:
+                          catalog["modules"] = [x for x in catalog["modules"] if x["id"] != module_id]
+                          catalog["modules"].append(entry)
+                          changed = True
+
+                      if is_new:
+                          new_log["modules"].append({
+                              "id": module_id, "name": manifest["name"], "version": manifest["version"],
+                              "importedAt": today, "upstream": f"{ORG}/{module_id}",
+                              "sourceTreeSha": commit_sha, "reviewStatus": "pending"
+                          })
+                          summary["added"].append(module_id)
+                      elif changed:
+                          summary["updated"].append(module_id)
+                      else:
+                          summary["unchanged"].append(module_id)
+                  except Exception as exc:
+                      summary["failed"].append({"id": module_id, "error": f"{type(exc).__name__}: {exc}"})
+                      print(f"[WARN] {module_id}: {type(exc).__name__}: {exc}")
+
+              standard["generatedAt"] = today
+              adult["generatedAt"] = today
+              new_log["generatedAt"] = today
+              write_json("index.json", standard)
+              write_json("adult-index.json", adult)
+              write_json("new-modules.json", new_log)
+          except Exception as exc:
+              summary["status"] = "completed_with_errors"
+              summary["fatalErrors"].append(f"{type(exc).__name__}: {exc}")
+              print(f"[WARN] 同步主流程异常：{type(exc).__name__}: {exc}")
+
+          if summary["failed"] or summary["fatalErrors"]:
+              summary["status"] = "completed_with_errors"
+          sync_log.setdefault("schemaVersion", 1)
+          sync_log.setdefault("runs", []).append(summary)
+          sync_log["runs"] = sync_log["runs"][-100:]
+          write_json("sync-log.json", sync_log)
+
+          print("===== 同步汇总 =====")
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          # 有意始终以 0 退出：上游单仓库故障不应把整轮 Actions 染红。
+          PY
+
+      - name: 提交同步结果
+        if: always()
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.json adult-index.json new-modules.json sync-log.json modules modules-adult
+          if git diff --cached --quiet; then
+            echo "没有文件变化，无需提交。"
+            exit 0
+          fi
+          git commit -m "sync: 自动同步上游模块"
+          git push origin HEAD:main
