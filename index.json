@@ -29,7 +29,13 @@
       "license": "not-declared",
       "repo": "xycvip/RedGuoAPI",
       "path": "modules/hanxiaoquan",
-      "adult": false
+      "adult": false,
+      "tag": "hanxiaoquan-v1.0.1",
+      "releaseTag": "hanxiaoquan-v1.0.1",
+      "sha256": {"manifest.json":"0e4df821ae106434135d9697fe6f6bf26e4cc4b0f8f51811250f2ef850bf5d62","main.js":"fb5237db127315994456dac11bd392867cf3d24beab2cfc17f1d0b6cc2be6f05"},
+      "assetName": "hanxiaoquan-1.0.1.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hanxiaoquan-v1.0.1/hanxiaoquan-1.0.1.zip"
+
     },
     {
       "id": "hongguo",
@@ -68,7 +74,13 @@
       "license": "not-declared",
       "repo": "xycvip/RedGuoAPI",
       "path": "modules/hongguo",
-      "adult": false
+      "adult": false,
+      "tag": "hongguo-v1.0.4",
+      "releaseTag": "hongguo-v1.0.4",
+      "sha256": {"manifest.json":"2828dcb8225eaf13fefe9fd8045753a4ff36f6c67b134dd1865bb7b7ff1e74fe","main.js":"66a7a6d296b274d30f060ec2dfce5e4015be09ae0655eb505f8a348c9612f1d1"},
+      "assetName": "hongguo-1.0.4.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hongguo-v1.0.4/hongguo-1.0.4.zip"
+
     },
     {
       "id": "ikanbot",
@@ -93,7 +105,13 @@
       "license": "not-declared",
       "repo": "xycvip/RedGuoAPI",
       "path": "modules/ikanbot",
-      "adult": false
+      "adult": false,
+      "tag": "ikanbot-v1.0.4",
+      "releaseTag": "ikanbot-v1.0.4",
+      "sha256": {"manifest.json":"aa973e87f75aaee68e36881a3bda7b5eebaea80788b70e3a9141dcf9006fcc1a","main.js":"db1b3ddc6477f3cbb738c73f407e63b530831916b64410f9a002fc2f86b04a92"},
+      "assetName": "ikanbot-1.0.4.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.4/ikanbot-1.0.4.zip"
+
     }
   ]
 }
