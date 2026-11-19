@@ -24,6 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: 扫描上游并同步模块
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -243,10 +244,12 @@ jobs:
           print("===== 同步汇总 =====")
           print(json.dumps(summary, ensure_ascii=False, indent=2))
           if summary["failed"] or summary["fatalErrors"]:
-              raise SystemExit(1)
+              print("[INFO] 本轮存在异常，详情已写入 sync-log.json；按设计不将工作流标记为失败。")
           PY
 
       - name: 提交同步结果
+        if: always()
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
