@@ -49,7 +49,7 @@ jobs:
           record = next((x for x in log["modules"] if x.get("id") == module_id), None)
           if not record or record.get("reviewStatus") != "pending":
               raise SystemExit("新增记录不存在或该模块已处理；请检查 new-modules.json")
-          standard_path, adult_path = Path("index.json"), Path("adult-index.json")
+          standard_path, adult_path = Path("index.json"), Path("allindex.json")
           standard, adult = json.loads(standard_path.read_text(encoding="utf-8")), json.loads(adult_path.read_text(encoding="utf-8"))
           if any(x["id"] == module_id for x in standard["modules"]):
               raise SystemExit("普通索引已存在该模块")
@@ -94,7 +94,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- modules modules-adult index.json adult-index.json new-modules.json
+          git add -A -- modules modules-adult index.json allindex.json new-modules.json
           git commit -m "promote: 人工核查通过转为普通模块 ${{ inputs.module_id }}"
           git push origin HEAD:main
           # GITHUB_TOKEN 推送不会触发 push 工作流，因此显式派发后续任务。
