@@ -10,7 +10,7 @@ on:
       - "modules/**"
       - "modules-adult/**"
       - "index.json"
-      - "adult-index.json"
+      - "allindex.json"
   workflow_dispatch:
     inputs:
       module_id:
@@ -64,8 +64,8 @@ jobs:
                       elif path == "index.json":
                           data = json.loads(Path("index.json").read_text(encoding="utf-8"))
                           selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
-                      elif path == "adult-index.json":
-                          data = json.loads(Path("adult-index.json").read_text(encoding="utf-8"))
+                      elif path == "allindex.json":
+                          data = json.loads(Path("allindex.json").read_text(encoding="utf-8"))
                           selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
           elif event == "workflow_dispatch":
               requested = os.environ.get("MODULE_ID", "").strip()
@@ -73,7 +73,7 @@ jobs:
                   selected.add(requested)
               else:
                   # 手动运行且未填写模块 ID：扫描两个索引中的全部模块
-                  for catalog_path in (Path("index.json"), Path("adult-index.json")):
+                  for catalog_path in (Path("index.json"), Path("allindex.json")):
                       if catalog_path.exists():
                           data = json.loads(catalog_path.read_text(encoding="utf-8"))
                           selected.update(
@@ -115,7 +115,7 @@ jobs:
           modules = [x for x in os.environ["MODULES"].split(",") if x]
           catalogs = [
               (Path("index.json"), Path("modules")),
-              (Path("adult-index.json"), Path("modules-adult")),
+              (Path("allindex.json"), Path("modules-adult")),
           ]
           changed_catalogs = set()
 
@@ -236,7 +236,7 @@ jobs:
           if changed_catalogs:
               subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
               subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
-              subprocess.run(["git", "add", "index.json", "adult-index.json"], check=True)
+              subprocess.run(["git", "add", "index.json", "allindex.json"], check=True)
               diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
               if diff.returncode != 0:
                   subprocess.run(["git", "commit", "-m", "chore(release): 自动更新模块发布索引"], check=True)
