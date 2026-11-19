@@ -179,7 +179,7 @@ jobs:
               if not by_id:
                   return original_text
 
-              match = re.search(r'"modules"\\s*:\\s*\\[', original_text)
+              match = re.search(r'"modules"\s*:\s*\[', original_text)
               if not match:
                   raise RuntimeError("无法定位 index.json 的 modules 数组")
               decoder = json.JSONDecoder()
