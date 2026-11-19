@@ -31,7 +31,7 @@ jobs:
               return subprocess.run(["gh", *args], input=input_data, text=True, capture_output=True, check=check)
 
           releases = json.loads(gh("api", f"repos/{repo}/releases?per_page=100").stdout)
-          catalogs = [Path("index.json"), Path("adult-index.json")]
+          catalogs = [Path("index.json"), Path("allindex.json")]
           catalog_data = {p: json.loads(p.read_text(encoding="utf-8")) for p in catalogs}
           renamed = 0
           errors = []
@@ -117,7 +117,7 @@ jobs:
 
           subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
           subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], check=True)
-          subprocess.run(["git", "add", "index.json", "adult-index.json"], check=True)
+          subprocess.run(["git", "add", "index.json", "allindex.json"], check=True)
           diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
           if diff.returncode != 0:
               subprocess.run(["git", "commit", "-m", "chore(release): 统一历史模块 ID+版本号附件命名"], check=True)
