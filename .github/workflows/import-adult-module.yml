@@ -109,7 +109,7 @@ jobs:
           sync_log = {"schemaVersion": 1, "runs": []}
           try:
               standard = json.loads(Path("index.json").read_text(encoding="utf-8"))
-              adult = json.loads(Path("adult-index.json").read_text(encoding="utf-8"))
+              adult = json.loads(Path("allindex.json").read_text(encoding="utf-8"))
               new_log = json.loads(Path("new-modules.json").read_text(encoding="utf-8"))
               sync_log_path = Path("sync-log.json")
               if sync_log_path.exists():
@@ -213,7 +213,7 @@ jobs:
               adult["generatedAt"] = today
               new_log["generatedAt"] = today
               write_json("index.json", standard)
-              write_json("adult-index.json", adult)
+              write_json("allindex.json", adult)
               write_json("new-modules.json", new_log)
           except Exception as exc:
               summary["status"] = "completed_with_errors"
@@ -238,7 +238,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.json adult-index.json new-modules.json sync-log.json modules modules-adult
+          git add index.json allindex.json new-modules.json sync-log.json modules modules-adult
           if git diff --cached --quiet; then
             echo "没有文件变化，无需提交。"
             exit 0
