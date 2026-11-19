@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/huangguoai",
+  "ref": "main",
+  "sourceTreeSha": "b7f1e5accc08cd93a4846f0bb6f67064aec1da56",
+  "files": {
+    "manifest.json": "7439d054b4672d1dc268bacfc886650e5142531905ff0fadc363e07af67efb61",
+    "main.js": "5b9e86ac42295b94b2abe1c8ee6a09cb2d86e01e45e44809f34ecb8b1cb7c5d0"
+  },
+  "importMethod": "source-copy"
+}

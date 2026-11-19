@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/beabox",
+  "ref": "main",
+  "sourceTreeSha": "e461382832b0aa6e1ba7d50575b40740327f2a9e",
+  "files": {
+    "manifest.json": "a9bad28677eefb7b454647c031694f2fb3d279dbde24a423d081349578d4928a",
+    "main.js": "0daff652429bdc456f7cd873f6fbe4bdf81a33ef634618239313430f1de4ab57"
+  },
+  "importMethod": "source-copy"
+}

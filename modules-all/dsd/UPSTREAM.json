@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/dsd",
+  "ref": "main",
+  "sourceTreeSha": "888e2f448eb52e7d40114e37f1a5feab0c62e076",
+  "files": {
+    "manifest.json": "20ae6c86a0d72e174eb8004ad32905bdefdec2a323c40a24bf65445221cc6565",
+    "main.js": "265afa272ac65273ec5d01b815d7905de3566c4329b57e131f854ec8105dbbbc"
+  },
+  "importMethod": "source-copy"
+}

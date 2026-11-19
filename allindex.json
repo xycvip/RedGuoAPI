@@ -1,0 +1,450 @@
+{
+  "format": 1,
+  "repository": "xycvip/RedGuoAPI",
+  "category": "adult",
+  "generatedAt": "2026-11-19",
+  "modules": [
+    {
+      "id": "beabox",
+      "name": "笔盒",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "bh4066.top",
+        "beabox.cc",
+        "beabox.live"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [],
+      "baseUrl": "https://bh4066.top",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/beabox",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/beabox",
+      "adult": true
+    },
+    {
+      "id": "dsd",
+      "name": "帝果",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "dsd.com.se",
+        "www.dsd.com.se"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "dsd.com.se",
+        "www.dsd.com.se"
+      ],
+      "baseUrl": "https://www.dsd.com.se",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/dsd",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/dsd",
+      "adult": true
+    },
+    {
+      "id": "guipian",
+      "name": "鬼片",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "guipianwu.com",
+        "www.guipianwu.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "guipianwu.com",
+        "www.guipianwu.com"
+      ],
+      "baseUrl": "https://guipianwu.com",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/guipian",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/guipian",
+      "adult": true
+    },
+    {
+      "id": "hanxiaoquan",
+      "name": "韩小圈",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "www.jennyhow.com",
+        "jennyhow.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "jennyhow.com",
+        "www.jennyhow.com"
+      ],
+      "baseUrl": "https://www.jennyhow.com",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/hanxiaoquan",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/hanxiaoquan",
+      "adult": true
+    },
+    {
+      "id": "heitao",
+      "name": "黑桃",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "heitaodj.com",
+        "www.heitaodj.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "heitaodj.com",
+        "www.heitaodj.com"
+      ],
+      "baseUrl": "https://heitaodj.com",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/heitao",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/heitao",
+      "adult": true
+    },
+    {
+      "id": "hongguo",
+      "name": "红果",
+      "version": "1.0.4",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "hongguoduanju.com",
+        "www.hongguoduanju.com",
+        "api5-normal-sinfonlineb.fqnovel.com",
+        "api5-normal-sinfonlinea.fqnovel.com",
+        "log.snssdk.com"
+      ],
+      "capabilities": [
+        "search",
+        "suggestions",
+        "recommendations",
+        "danmaku",
+        "devices",
+        "rankings",
+        "seasons",
+        "cover",
+        "metadata",
+        "catalogState"
+      ],
+      "aliases": [
+        "hongguoduanju.com",
+        "www.hongguoduanju.com"
+      ],
+      "baseUrl": "https://hongguoduanju.com",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/hongguo",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/hongguo",
+      "adult": true
+    },
+    {
+      "id": "huangguo-video",
+      "name": "黄果视频",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "huangguo.video"
+      ],
+      "capabilities": [
+        "cover",
+        "mediaAuth"
+      ],
+      "aliases": [
+        "huangguo.video"
+      ],
+      "baseUrl": "https://huangguo.video",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/huangguo-video",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/huangguo-video",
+      "adult": true
+    },
+    {
+      "id": "huangguoai",
+      "name": "黄果 AI",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "huangguoai.com",
+        "*.lbvrhyir.cc",
+        "*.xxbgwypx.cc",
+        "*.ediayikma.cc",
+        "*.agdkczeyx.cc"
+      ],
+      "capabilities": [
+        "search",
+        "rankings"
+      ],
+      "aliases": [
+        "huangguo",
+        "huangguoai.com"
+      ],
+      "baseUrl": "https://huangguoai.com",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/huangguoai",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/huangguoai",
+      "adult": true
+    },
+    {
+      "id": "huangju",
+      "name": "剧果",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "huangju.net",
+        "www.huangju.net",
+        "api.huangju.net"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "huangju.net",
+        "www.huangju.net",
+        "api.huangju.net"
+      ],
+      "baseUrl": "https://huangju.net",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/huangju",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/huangju",
+      "adult": true
+    },
+    {
+      "id": "jinguoduanju",
+      "name": "禁果短剧",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "jinguoduanju.app",
+        "www.jinguoduanju.app",
+        "play.jinguoduanju.app",
+        "jgdj.app",
+        "www.jgdj.app"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "jinguoduanju.app",
+        "www.jinguoduanju.app",
+        "play.jinguoduanju.app",
+        "jgdj.app",
+        "www.jgdj.app"
+      ],
+      "baseUrl": "https://jinguoduanju.app",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/jinguoduanju",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/jinguoduanju",
+      "adult": true
+    },
+    {
+      "id": "missav",
+      "name": "MissAV",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "missav.live",
+        "www.missav.live"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "missav.live",
+        "www.missav.live"
+      ],
+      "baseUrl": "https://missav.live",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/missav",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/missav",
+      "adult": true
+    },
+    {
+      "id": "sorani",
+      "name": "青空",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "api.sorani.cc"
+      ],
+      "capabilities": [
+        "search",
+        "account"
+      ],
+      "aliases": [
+        "sorani.net",
+        "www.sorani.net",
+        "api.sorani.cc",
+        "sorani.cc"
+      ],
+      "baseUrl": "https://www.sorani.net",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/sorani",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/sorani",
+      "adult": true
+    },
+    {
+      "id": "yeguo",
+      "name": "野果",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "ygdj7.com",
+        "www.ygdj7.com",
+        "ygdj15.com",
+        "www.ygdj15.com",
+        "delta.ygrwdsgt.cc",
+        "yeguodj.com",
+        "www.yeguodj.com",
+        "*.buxefaex.cc",
+        "*.fzchosdi.cc",
+        "*.lwblvxvy.cc",
+        "*.vgbyziuz.cc"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "ygdj7.com",
+        "www.ygdj7.com",
+        "ygdj15.com",
+        "www.ygdj15.com",
+        "analyze.buxefaex.cc",
+        "attract.vgbyziuz.cc",
+        "delta.ygrwdsgt.cc",
+        "yeguodj.com",
+        "www.yeguodj.com"
+      ],
+      "baseUrl": "https://attract.vgbyziuz.cc",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/yeguo",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/yeguo",
+      "adult": true
+    },
+    {
+      "id": "hanime1",
+      "name": "Hanime1",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "hanime1.me",
+        "www.hanime1.me"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "hanime1.me",
+        "www.hanime1.me"
+      ],
+      "baseUrl": "https://hanime1.me",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/hanime1",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/hanime1",
+      "adult": true
+    },
+    {
+      "id": "ikanbot",
+      "name": "爱看机器人",
+      "version": "1.0.4",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "ikanbot.com",
+        "www.ikanbot.com",
+        "www1.ikanbot.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [],
+      "baseUrl": "https://movie.douban.com",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/ikanbot",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/ikanbot",
+      "adult": true
+    }
+  ]
+}
