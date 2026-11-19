@@ -28,9 +28,9 @@ jobs:
               ("index.json", Path("modules"), "standard"),
               ("allindex.json", Path("moudules-all"), "adult"),
           ]
-          seen = set()
           catalog_ids = {}
           for catalog_name, root, category in catalogs:
+              seen_in_catalog = set()
               data = json.loads(Path(catalog_name).read_text(encoding="utf-8"))
               assert data.get("format") == 1
               assert data.get("repository") == repo
@@ -42,8 +42,8 @@ jobs:
                   for key in ("id", "name", "version", "runtime", "api", "upstream", "license", "path", "repo"):
                       assert entry.get(key), f"{catalog_name}: missing {key}: {entry}"
                   module_id = entry["id"]
-                  assert module_id not in seen, f"duplicate module id: {module_id}"
-                  seen.add(module_id)
+                  assert module_id not in seen_in_catalog, f"{catalog_name}: duplicate module id: {module_id}"
+                  seen_in_catalog.add(module_id)
                   assert entry.get("runtime") == "js" and entry.get("api") == 1
                   assert isinstance(entry.get("hosts"), list)
                   assert entry.get("sourceImport") == "imported"
@@ -76,6 +76,9 @@ jobs:
               if status == "pending":
                   assert module_id in catalog_ids["allindex.json"], f"待核查模块不在限制级索引：{module_id}"
               else:
-                  assert module_id in catalog_ids["index.json"], f"已转普通模块未登记普通索引：{module_id}"
+                  assert module_id in catalog_ids["allindex.json"], f"已核查模块的限制级原件不在 allindex.json：{module_id}"
+                  assert module_id in catalog_ids["index.json"], f"已核查模块的普通副本未登记 index.json：{module_id}"
+                  assert (Path("moudules-all") / module_id).is_dir(), f"已核查模块的限制级原件目录缺失：{module_id}"
+                  assert (Path("modules") / module_id).is_dir(), f"已核查模块的普通副本目录缺失：{module_id}"
           print(f"校验通过：普通模块 {len(standard_dirs)} 个，限制级模块 {len(adult_dirs)} 个，新增核查记录 {len(recorded)} 条。")
           PY
