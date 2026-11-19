@@ -164,25 +164,49 @@ jobs:
                   old_hashes = entry.get("sha256", {})
                   old_release = entry.get("releaseTag", entry.get("tag", ""))
 
-                  if old_release and old_hashes == hashes and entry.get("assetName") and entry.get("assetUrl") and entry.get("tag"):
-                      print(f"[UNCHANGED] {module_id} {version}: 文件指纹未变化")
-                      continue
-
                   tag = f"{module_id}-v{version}"
-                  if old_release == tag:
-                      print(f"[VERSION-NOT-BUMPED] {module_id}: 源码已变化，但 manifest.version 仍为 {version}；请上游提升版本号后再发布")
-                      continue
+                  asset_filename = f"{module_id}-{version}.zip"
 
+                  def make_archive():
+                      archive_path = Path(asset_filename)
+                      with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
+                          z.write(manifest_path, "manifest.json")
+                          z.write(main_path, "main.js")
+                      return archive_path
+
+                  # 必须先检查 GitHub 上的真实 Release 状态，不能仅凭索引旧记录判断已发布。
                   existing = gh("release", "view", tag, check=False)
                   if existing.returncode == 0:
-                      # Release 已存在时不重复上传；改为核对附件并补齐索引元数据。
                       release_info = gh("api", f"repos/{repository}/releases/tags/{tag}")
                       release_data = json.loads(release_info.stdout)
-                      asset_filename = f"{module_id}-{version}.zip"
                       asset = next((a for a in release_data.get("assets", []) if a.get("name") == asset_filename), None)
+
                       if not asset:
-                          print(f"[ERROR] {module_id}: Release {tag} 已存在，但缺少附件 {asset_filename}，未覆盖原 Release")
+                          # Release 存在但附件丢失：只补传缺失附件，不删除或覆盖其他附件。
+                          archive = make_archive()
+                          upload = gh("release", "upload", tag, str(archive), check=False)
+                          if upload.returncode != 0:
+                              print(f"[ERROR] {module_id}: Release {tag} 的附件补传失败：{upload.stderr.strip()}")
+                              continue
+                          release_info = gh("api", f"repos/{repository}/releases/tags/{tag}")
+                          release_data = json.loads(release_info.stdout)
+                          asset = next((a for a in release_data.get("assets", []) if a.get("name") == asset_filename), None)
+                          if not asset:
+                              print(f"[ERROR] {module_id}: 附件补传后仍未通过核验")
+                              continue
+                          repaired_action = "缺失附件已补传"
+                      else:
+                          repaired_action = "已有 Release 与附件"
+
+                      # Release 已真实存在时，才执行版本未提升判断。
+                      if old_release == tag and old_hashes != hashes:
+                          print(f"[VERSION-NOT-BUMPED] {module_id}: 源码已变化，但 manifest.version 仍为 {version}；请上游提升版本号后再发布")
                           continue
+
+                      if old_release == tag and old_hashes == hashes and entry.get("assetName") == asset_filename and entry.get("assetUrl") and entry.get("tag") == tag:
+                          print(f"[UNCHANGED] {module_id} {version}: Release、附件及文件指纹均未变化")
+                          continue
+
                       entry["version"] = version
                       entry["tag"] = tag
                       entry["releaseTag"] = tag
@@ -194,15 +218,11 @@ jobs:
                       data["generatedAt"] = date.today().isoformat()
                       catalog_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                       changed_catalogs.add(catalog_path)
-                      print(f"[REPAIRED] {module_id} {version}: 已存在 Release 的索引下载信息与 SHA256 已补齐")
+                      print(f"[REPAIRED] {module_id} {version}: {repaired_action}，索引元数据已核验并补齐")
                       continue
 
-                  # 先用 ASCII 临时名上传，再通过 Release Asset API 设置模块 ID+版本号附件名。
-                  archive = Path(f"{module_id}-{version}.zip")
-                  asset_filename = f"{module_id}-{version}.zip"
-                  with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
-                      z.write(manifest_path, "manifest.json")
-                      z.write(main_path, "main.js")
+                  # GitHub 上不存在该版本 Release：即使索引保留旧 tag/hash，也按首次发布创建。
+                  archive = make_archive()
 
                   notes = f"模块：{module_name}\n版本：{version}\n\n由 RedGuoAPI 自动检测上游更新并发布。ZIP 仅包含 manifest.json 和 main.js。"
                   result = gh("release", "create", tag, str(archive), "--title", f"{module_name} v{version}", "--notes", notes)
