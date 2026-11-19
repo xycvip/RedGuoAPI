@@ -7,9 +7,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "modules/**"
       - "moudules-all/**"
-      - "index.json"
       - "allindex.json"
   workflow_dispatch:
     inputs:
@@ -72,14 +70,14 @@ jobs:
               if requested:
                   selected.add(requested)
               else:
-                  # 手动运行且未填写模块 ID：扫描两个索引中的全部模块
-                  for catalog_path in (Path("index.json"), Path("allindex.json")):
-                      if catalog_path.exists():
-                          data = json.loads(catalog_path.read_text(encoding="utf-8"))
-                          selected.update(
-                              entry.get("id", "") for entry in data.get("modules", [])
-                              if isinstance(entry, dict)
-                          )
+                  # 手动运行且未填写模块 ID：只扫描全量模块索引
+                  catalog_path = Path("allindex.json")
+                  if catalog_path.exists():
+                      data = json.loads(catalog_path.read_text(encoding="utf-8"))
+                      selected.update(
+                          entry.get("id", "") for entry in data.get("modules", [])
+                          if isinstance(entry, dict)
+                      )
           else:
               # 上游自动同步完成后：只处理本轮新增或更新的模块
               log_path = Path("sync-log.json")
@@ -91,7 +89,21 @@ jobs:
                       selected.update(latest.get("added", []))
                       selected.update(latest.get("updated", []))
 
-          selected = sorted(x for x in selected if re.fullmatch(r"[a-z0-9][a-z0-9-]*", x))
+          # 最终白名单：必须同时存在于 allindex.json 和 moudules-all/<ID>/
+          catalog_path = Path("allindex.json")
+          allowed = set()
+          if catalog_path.exists():
+              data = json.loads(catalog_path.read_text(encoding="utf-8"))
+              allowed = {
+                  x.get("id", "") for x in data.get("modules", [])
+                  if isinstance(x, dict) and isinstance(x.get("id"), str)
+              }
+          selected = sorted(
+              x for x in selected
+              if re.fullmatch(r"[a-z0-9][a-z0-9-]*", x)
+              and x in allowed
+              and (Path("moudules-all") / x).is_dir()
+          )
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("modules=" + ",".join(selected) + "\n")
           print("待检查模块：" + (", ".join(selected) if selected else "无"))
@@ -114,7 +126,6 @@ jobs:
           token = os.environ["GH_TOKEN"]
           modules = [x for x in os.environ["MODULES"].split(",") if x]
           catalogs = [
-              (Path("index.json"), Path("modules")),
               (Path("allindex.json"), Path("moudules-all")),
           ]
           changed_catalogs = set()
