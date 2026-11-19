@@ -1,0 +1,102 @@
+name: 人工核查并转为普通模块
+on:
+  workflow_dispatch:
+    inputs:
+      module_id:
+        description: 输入 new-modules.json 中 reviewStatus 为 pending 的模块 ID
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: promote-module-${{ inputs.module_id }}
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: 核查并迁移到普通模块
+        env:
+          MODULE_ID: ${{ inputs.module_id }}
+        run: |
+          python - <<'PY'
+          import json, os, re, shutil
+          from datetime import date
+          from pathlib import Path
+          module_id = os.environ["MODULE_ID"].strip()
+          if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", module_id):
+              raise SystemExit("模块 ID 格式无效")
+          source = Path("modules-adult") / module_id
+          target = Path("modules") / module_id
+          if not source.is_dir() or target.exists():
+              raise SystemExit("限制级模块不存在，或普通目录已存在")
+          for f in ("main.js", "manifest.json", "UPSTREAM.json"):
+              if not (source / f).is_file():
+                  raise SystemExit(f"模块文件不完整：缺少 {f}")
+          manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+          upstream = json.loads((source / "UPSTREAM.json").read_text(encoding="utf-8"))
+          if manifest.get("id") != module_id or manifest.get("runtime") != "js" or manifest.get("api") != 1:
+              raise SystemExit("manifest ID 或 runtime/api 校验失败")
+          if not manifest.get("name") or not manifest.get("version") or not upstream.get("repository"):
+              raise SystemExit("模块信息或上游来源记录不完整")
+          log_path = Path("new-modules.json")
+          log = json.loads(log_path.read_text(encoding="utf-8"))
+          record = next((x for x in log["modules"] if x.get("id") == module_id), None)
+          if not record or record.get("reviewStatus") != "pending":
+              raise SystemExit("新增记录不存在或该模块已处理；请检查 new-modules.json")
+          standard_path, adult_path = Path("index.json"), Path("adult-index.json")
+          standard, adult = json.loads(standard_path.read_text(encoding="utf-8")), json.loads(adult_path.read_text(encoding="utf-8"))
+          if any(x["id"] == module_id for x in standard["modules"]):
+              raise SystemExit("普通索引已存在该模块")
+          if not any(x["id"] == module_id for x in adult["modules"]):
+              raise SystemExit("限制级索引中找不到该模块")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          shutil.move(str(source), str(target))
+          adult_entry = next(x for x in adult["modules"] if x["id"] == module_id)
+          adult["modules"] = [x for x in adult["modules"] if x["id"] != module_id]
+          adult["generatedAt"] = date.today().isoformat()
+          entry = {
+              "id": module_id, "name": manifest["name"], "version": manifest["version"],
+              "runtime": manifest["runtime"], "api": manifest["api"],
+              "hosts": manifest.get("hosts", []), "capabilities": manifest.get("capabilities", []),
+              "aliases": manifest.get("aliases", []), "baseUrl": manifest.get("baseUrl", ""),
+              "allowEmptyCatalog": manifest.get("allowEmptyCatalog", False),
+              "upstream": "https://github.com/" + upstream["repository"],
+              "upstreamRef": upstream.get("ref", "main"), "sourceImport": "imported",
+              "license": "not-declared", "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"), "path": "modules/" + module_id
+          }
+          # 保留原限制级索引中已有的发布信息，避免迁移后 ZIP 下载地址和校验值丢失。
+          for key in ("tag", "releaseTag", "sha256", "assetName", "assetUrl"):
+              if key in adult_entry:
+                  entry[key] = adult_entry[key]
+          if module_id == "hongguo":
+              standard["modules"].insert(0, entry)
+          else:
+              standard["modules"].append(entry)
+          standard["generatedAt"] = date.today().isoformat()
+          # 已完成核查并迁移：从待核查新增记录中彻底移除。
+          log["modules"] = [x for x in log["modules"] if x.get("id") != module_id]
+          log["generatedAt"] = date.today().isoformat()
+          standard_path.write_text(json.dumps(standard, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          adult_path.write_text(json.dumps(adult, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(f"核查迁移完成：{module_id} 已转入普通模块，并已从新增核查记录中移除。")
+          PY
+      - name: 提交核查结果并触发发布及校验
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE_ID: ${{ inputs.module_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- modules modules-adult index.json adult-index.json new-modules.json
+          git commit -m "promote: 人工核查通过转为普通模块 ${{ inputs.module_id }}"
+          git push origin HEAD:main
+          # GITHUB_TOKEN 推送不会触发 push 工作流，因此显式派发后续任务。
+          gh workflow run release-module.yml --ref main -f module_id="$MODULE_ID"
+          gh workflow run validate-modules.yml --ref main
