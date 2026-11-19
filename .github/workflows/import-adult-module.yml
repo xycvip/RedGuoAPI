@@ -19,13 +19,11 @@ jobs:
     steps:
       - name: 检出本仓库
         uses: actions/checkout@v4
-        continue-on-error: true
         with:
           ref: main
           fetch-depth: 0
 
       - name: 扫描上游并同步模块
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -92,7 +90,7 @@ jobs:
                   "sourceImport": "imported",
                   "license": old.get("license", "not-declared"),
                   "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
-                  "path": f"{'modules' if category == 'standard' else 'modules-adult'}/{module_id}"
+                  "path": f"{'modules' if category == 'standard' else 'moudules-all'}/{module_id}"
               }
               # adult 仅作为兼容性元数据；实际分类由目录和索引决定。
               if "adult" in old:
@@ -107,10 +105,25 @@ jobs:
               Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
           sync_log = {"schemaVersion": 1, "runs": []}
+          Path("modules").mkdir(parents=True, exist_ok=True)
+          Path("moudules-all").mkdir(parents=True, exist_ok=True)
           try:
-              standard = json.loads(Path("index.json").read_text(encoding="utf-8"))
-              adult = json.loads(Path("allindex.json").read_text(encoding="utf-8"))
-              new_log = json.loads(Path("new-modules.json").read_text(encoding="utf-8"))
+              # 新仓库首次运行时初始化空索引，不要求迁移旧仓库模块数据。
+              standard_path = Path("index.json")
+              adult_path = Path("allindex.json")
+              new_log_path = Path("new-modules.json")
+              if standard_path.exists():
+                  standard = json.loads(standard_path.read_text(encoding="utf-8"))
+              else:
+                  standard = {"format": 1, "repository": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"), "category": "standard", "generatedAt": today, "modules": []}
+              if adult_path.exists():
+                  adult = json.loads(adult_path.read_text(encoding="utf-8"))
+              else:
+                  adult = {"format": 1, "repository": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"), "category": "adult", "generatedAt": today, "modules": []}
+              if new_log_path.exists():
+                  new_log = json.loads(new_log_path.read_text(encoding="utf-8"))
+              else:
+                  new_log = {"schemaVersion": 1, "generatedAt": today, "modules": []}
               sync_log_path = Path("sync-log.json")
               if sync_log_path.exists():
                   sync_log = json.loads(sync_log_path.read_text(encoding="utf-8"))
@@ -162,7 +175,7 @@ jobs:
                       is_new = category is None
                       if is_new:
                           category = "adult"
-                      root = Path("modules" if category == "standard" else "modules-adult")
+                      root = Path("modules" if category == "standard" else "moudules-all")
                       target = root / module_id
                       target.mkdir(parents=True, exist_ok=True)
                       files = {"manifest.json": manifest_bytes, "main.js": main_bytes}
@@ -229,16 +242,15 @@ jobs:
 
           print("===== 同步汇总 =====")
           print(json.dumps(summary, ensure_ascii=False, indent=2))
-          # 有意始终以 0 退出：上游单仓库故障不应把整轮 Actions 染红。
+          if summary["failed"] or summary["fatalErrors"]:
+              raise SystemExit(1)
           PY
 
       - name: 提交同步结果
-        if: always()
-        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.json allindex.json new-modules.json sync-log.json modules modules-adult
+          git add -A -- index.json allindex.json new-modules.json sync-log.json modules moudules-all
           if git diff --cached --quiet; then
             echo "没有文件变化，无需提交。"
             exit 0
