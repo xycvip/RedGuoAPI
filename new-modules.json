@@ -48,15 +48,6 @@
       "reviewStatus": "pending"
     },
     {
-      "id": "hongguo",
-      "name": "红果",
-      "version": "1.0.4",
-      "importedAt": "2026-11-19",
-      "upstream": "guoapp-modules/hongguo",
-      "sourceTreeSha": "dc5ae4997a4a27c6b7f009bbd1eda7d6776916ab",
-      "reviewStatus": "pending"
-    },
-    {
       "id": "huangguo-video",
       "name": "黄果视频",
       "version": "1.0.1",
