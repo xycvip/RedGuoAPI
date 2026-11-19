@@ -81,6 +81,40 @@
       },
       "assetName": "ikanbot-1.0.4.zip",
       "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.4/ikanbot-1.0.4.zip"
+    },
+    {
+      "id": "hanxiaoquan",
+      "name": "韩小圈",
+      "version": "1.0.1",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "www.jennyhow.com",
+        "jennyhow.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [
+        "jennyhow.com",
+        "www.jennyhow.com"
+      ],
+      "baseUrl": "https://www.jennyhow.com",
+      "allowEmptyCatalog": true,
+      "upstream": "https://github.com/guoapp-modules/hanxiaoquan",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules/hanxiaoquan",
+      "tag": "hanxiaoquan-v1.0.1",
+      "releaseTag": "hanxiaoquan-v1.0.1",
+      "sha256": {
+        "manifest.json": "0e4df821ae106434135d9697fe6f6bf26e4cc4b0f8f51811250f2ef850bf5d62",
+        "main.js": "fb5237db127315994456dac11bd392867cf3d24beab2cfc17f1d0b6cc2be6f05"
+      },
+      "assetName": "hanxiaoquan-1.0.1.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hanxiaoquan-v1.0.1/hanxiaoquan-1.0.1.zip"
     }
   ]
 }

@@ -30,15 +30,6 @@
       "reviewStatus": "pending"
     },
     {
-      "id": "hanxiaoquan",
-      "name": "韩小圈",
-      "version": "1.0.1",
-      "importedAt": "2026-11-19",
-      "upstream": "guoapp-modules/hanxiaoquan",
-      "sourceTreeSha": "41d29eefed5db2ce3b4af317ad4f9bd1b1d5821d",
-      "reviewStatus": "pending"
-    },
-    {
       "id": "heitao",
       "name": "黑桃",
       "version": "1.0.1",
