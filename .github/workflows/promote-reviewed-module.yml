@@ -31,7 +31,7 @@ jobs:
           module_id = os.environ["MODULE_ID"].strip()
           if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", module_id):
               raise SystemExit("模块 ID 格式无效")
-          source = Path("modules-adult") / module_id
+          source = Path("moudules-all") / module_id
           target = Path("modules") / module_id
           if not source.is_dir() or target.exists():
               raise SystemExit("限制级模块不存在，或普通目录已存在")
@@ -94,7 +94,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- modules modules-adult index.json allindex.json new-modules.json
+          git add -A -- modules moudules-all index.json allindex.json new-modules.json
           git commit -m "promote: 人工核查通过转为普通模块 ${{ inputs.module_id }}"
           git push origin HEAD:main
           # GITHUB_TOKEN 推送不会触发 push 工作流，因此显式派发后续任务。
