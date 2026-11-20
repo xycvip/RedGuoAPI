@@ -1,10 +1,10 @@
 {
   "repository": "guoapp-modules/hongguo",
   "ref": "main",
-  "sourceTreeSha": "4bcaea63141fcb18c1b1c621c33f25838f625235",
+  "sourceTreeSha": "cdf8a24b83df522aeceff860b45f1cb2efa2f286",
   "files": {
-    "manifest.json": "b5b9e8b75fe9b0a7b116c267e81311f52f8f21abfe2ba33cadb17c16e03561dd",
-    "main.js": "9444021256cc6931f21d9c0f330283f34d1294c897401761615a05327e4f8322"
+    "manifest.json": "8a922cfd6f16b1d6d145265b73bd8ee35deda73c1ec9b2f27b444a231888ec4f",
+    "main.js": "457f75b556cb0fb6f103b91fd9831f173ecbfdb266fa0bfe16f292d88a0a7b24"
   },
   "importMethod": "source-copy"
 }

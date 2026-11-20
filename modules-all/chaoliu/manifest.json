@@ -1,0 +1,33 @@
+{
+  "id": "chaoliu",
+  "name": "潮流AV",
+  "version": "1.0.9",
+  "description": "分类视频 · 在线搜索 · 1080P/720P",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": [
+    "mjv001.com", "*.mjv001.com",
+    "mjv002.com", "*.mjv002.com",
+    "mjv003.com", "*.mjv003.com",
+    "mjv004.com", "*.mjv004.com",
+    "mjv005.com", "*.mjv005.com",
+    "mjv006.com", "*.mjv006.com",
+    "mjv007.com", "*.mjv007.com",
+    "mjv008.com", "*.mjv008.com",
+    "mjv009.com", "*.mjv009.com",
+    "mjv010.com", "*.mjv010.com",
+    "mjv011.com", "*.mjv011.com",
+    "mjv012.com", "*.mjv012.com",
+    "mjv013.com", "*.mjv013.com",
+    "mjv014.com", "*.mjv014.com",
+    "mjv015.com", "*.mjv015.com",
+    "eemmhh01.com", "*.eemmhh01.com",
+    "imgstream1.com", "*.imgstream1.com",
+    "streamfastpro.com", "*.streamfastpro.com"
+  ],
+  "capabilities": ["search"],
+  "aliases": ["潮流av", "mjv"],
+  "allowEmptyCatalog": true,
+  "noHostRotation": true
+}

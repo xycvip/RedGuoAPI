@@ -40,42 +40,9 @@
       "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hanxiaoquan-v1.0.1/hanxiaoquan-1.0.1.zip"
     },
     {
-      "id": "ikanbot",
-      "name": "爱看机器人",
-      "version": "1.0.4",
-      "runtime": "js",
-      "api": 1,
-      "hosts": [
-        "ikanbot.com",
-        "www.ikanbot.com",
-        "www1.ikanbot.com"
-      ],
-      "capabilities": [
-        "search"
-      ],
-      "aliases": [],
-      "baseUrl": "https://movie.douban.com",
-      "allowEmptyCatalog": false,
-      "upstream": "https://github.com/guoapp-modules/ikanbot",
-      "upstreamRef": "main",
-      "sourceImport": "imported",
-      "license": "not-declared",
-      "repo": "xycvip/RedGuoAPI",
-      "path": "modules/ikanbot",
-      "adult": false,
-      "tag": "ikanbot-v1.0.4",
-      "releaseTag": "ikanbot-v1.0.4",
-      "sha256": {
-        "manifest.json": "aa973e87f75aaee68e36881a3bda7b5eebaea80788b70e3a9141dcf9006fcc1a",
-        "main.js": "db1b3ddc6477f3cbb738c73f407e63b530831916b64410f9a002fc2f86b04a92"
-      },
-      "assetName": "ikanbot-1.0.4.zip",
-      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.4/ikanbot-1.0.4.zip"
-    },
-    {
       "id": "hongguo",
       "name": "红果",
-      "version": "1.0.6",
+      "version": "1.0.7",
       "runtime": "js",
       "api": 1,
       "hosts": [
@@ -83,7 +50,8 @@
         "www.hongguoduanju.com",
         "api5-normal-sinfonlineb.fqnovel.com",
         "api5-normal-sinfonlinea.fqnovel.com",
-        "log.snssdk.com"
+        "log.snssdk.com",
+        "vas-lf-x.snssdk.com"
       ],
       "capabilities": [
         "search",
@@ -110,14 +78,47 @@
       "repo": "xycvip/RedGuoAPI",
       "path": "modules/hongguo",
       "sha256": {
-        "manifest.json": "b5b9e8b75fe9b0a7b116c267e81311f52f8f21abfe2ba33cadb17c16e03561dd",
-        "main.js": "9444021256cc6931f21d9c0f330283f34d1294c897401761615a05327e4f8322"
+        "manifest.json": "8a922cfd6f16b1d6d145265b73bd8ee35deda73c1ec9b2f27b444a231888ec4f",
+        "main.js": "457f75b556cb0fb6f103b91fd9831f173ecbfdb266fa0bfe16f292d88a0a7b24"
       },
       "adult": false,
       "tag": "hongguo-v1.0.6",
       "releaseTag": "hongguo-v1.0.6",
       "assetName": "hongguo-1.0.6.zip",
       "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hongguo-v1.0.6/hongguo-1.0.6.zip"
+    },
+    {
+      "id": "ikanbot",
+      "name": "爱看机器人",
+      "version": "1.0.5",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "ikanbot.com",
+        "www.ikanbot.com",
+        "www1.ikanbot.com"
+      ],
+      "capabilities": [
+        "search"
+      ],
+      "aliases": [],
+      "baseUrl": "https://movie.douban.com",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/ikanbot",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules/ikanbot",
+      "sha256": {
+        "manifest.json": "ee4cc7ed52548bbfebaf8bb85871776ce665a645c7dedef1d0c93af01667bdaa",
+        "main.js": "9d886e67b1e36ed0911b9b701292fe578d6de505fe2f0e4ac8bd6d5abc950767"
+      },
+      "adult": false,
+      "tag": "ikanbot-v1.0.4",
+      "releaseTag": "ikanbot-v1.0.4",
+      "assetName": "ikanbot-1.0.4.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.4/ikanbot-1.0.4.zip"
     }
   ]
 }

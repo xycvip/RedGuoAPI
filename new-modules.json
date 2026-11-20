@@ -109,6 +109,15 @@
       "upstream": "guoapp-modules/hanime1",
       "sourceTreeSha": "9ddeca08004543d45c15e856271d6cc605a98ec2",
       "reviewStatus": "pending"
+    },
+    {
+      "id": "chaoliu",
+      "name": "潮流AV",
+      "version": "1.0.9",
+      "importedAt": "2026-11-20",
+      "upstream": "guoapp-modules/chaoliu",
+      "sourceTreeSha": "3e1c21923b52d5cd065aab1f33e3f98edc5fd546",
+      "reviewStatus": "pending"
     }
   ]
 }

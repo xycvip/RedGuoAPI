@@ -1,13 +1,19 @@
 const siteBaseUrl = "https://hongguoduanju.com";
 const appBaseUrl = "https://api5-normal-sinfonlineb.fqnovel.com";
 const playbackBaseUrl = "https://api5-normal-sinfonlinea.fqnovel.com";
-const playbackUserAgent = "com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)";
-const appUserAgent = "com.phoenix.read/73532 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)";
+const appVersionCode = "74532";
+const appVersionName = "7.4.5.32";
+const playbackUserAgent = "com.phoenix.read/" + appVersionCode + " (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)";
+const appUserAgent = "com.phoenix.read/" + appVersionCode + " (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)";
 const webUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1";
 const deviceRegisterUrl = "https://log.snssdk.com/service/2/device_register/";
 const mediaReferer = "https://novel.snssdk.com/";
 const responseLimit = 20 * 1024 * 1024;
 const cencScheme = "hongguo-cenc://";
+const playUrlSalts = ["4dd4c2e6b83162090e52b3c7a6733ba41cb2462b829ab58a196b39db57177524f49baf7f08e8d68d26a72e37c1a95a2f1f05a51892aef2949732b62a38aadd58"];
+const playUrlHeaderSize = 4;
+const playUrlPattern = /^https?:\/\/\S+$/;
+const fallbackCodecTypes = ["1", "3"];
 const audioScheme = "hongguo-audio://";
 const bookPrefix = "book-";
 const legacySeriesPrefix = "hg-series-v1:";
@@ -666,7 +672,7 @@ function playerArgus(query, body, timestamp, deviceId, nonce) {
   bytesField(message, 4, host.utf8Encode("8662"));
   bytesField(message, 5, host.utf8Encode(deviceId));
   bytesField(message, 6, host.utf8Encode("1611921764"));
-  bytesField(message, 7, host.utf8Encode("7.3.5.32"));
+  bytesField(message, 7, host.utf8Encode(appVersionName));
   bytesField(message, 8, host.utf8Encode("v04.07.01-ml-android"));
   varintField(message, 9, 135135744);
   bytesField(message, 10, new Uint8Array(8));
@@ -1352,8 +1358,8 @@ function deviceOf(state, helper) {
 
 function appQuery(deviceId, installId) {
   return {
-    aid: "8662", app_name: "novelread", version_code: "73532", version_name: "7.3.5.32",
-    manifest_version_code: "73532", update_version_code: "73532", channel: "update_64",
+    aid: "8662", app_name: "novelread", version_code: appVersionCode, version_name: appVersionName,
+    manifest_version_code: appVersionCode, update_version_code: appVersionCode, channel: "update_64",
     device_platform: "android", os: "android", ssmix: "a", device_type: "25053RT47C",
     device_brand: "Redmi", language: "zh", os_api: "36", os_version: "16",
     resolution: "1280*2772", dpi: "520", ac: "wifi", device_id: deviceId, iid: installId,
@@ -1362,8 +1368,8 @@ function appQuery(deviceId, installId) {
 
 function registerDevice() {
   const header = {
-    display_name: "红果免费短剧", aid: 8662, app_version: "7.3.5.32", version_code: 73532,
-    manifest_version_code: 73532, update_version_code: 73532, channel: "update_64", package: "com.phoenix.read",
+    display_name: "红果免费短剧", aid: 8662, app_version: appVersionName, version_code: Number(appVersionCode),
+    manifest_version_code: Number(appVersionCode), update_version_code: Number(appVersionCode), channel: "update_64", package: "com.phoenix.read",
     app_language: "zh", os: "Android", os_version: "16", os_api: 36, device_model: "25053RT47C",
     device_brand: "Redmi", device_manufacturer: "Xiaomi", cpu_abi: "arm64-v8a", density_dpi: 520,
     display_density: "xxhdpi", resolution: "2772x1280", language: "zh", timezone: 8, access: "wifi",
@@ -1455,9 +1461,9 @@ function timeoutError() {
 
 function playbackQuery(deviceId, installId) {
   return {
-    aid: "8662", app_name: "novelread", version_code: "74332", version_name: "7.4.3.32",
+    aid: "8662", app_name: "novelread", version_code: appVersionCode, version_name: appVersionName,
     channel: "vivo_8662_64", device_platform: "android", device_type: "PGT-AN10", os_version: "12",
-    update_version_code: "74332", iid: installId, cdid: uuidLike(), device_id: deviceId,
+    update_version_code: appVersionCode, iid: installId, cdid: uuidLike(), device_id: deviceId,
   };
 }
 
@@ -2324,7 +2330,7 @@ function fetchTabMedia(videoId, helper) {
   if (isEmptyRecord(data)) {
     throw new Error("红果 App 未返回所请求的分集播放信息");
   }
-  return selectAppMedia(appVideoModel(data));
+  return mediaFromModel(appVideoModel(data));
 }
 
 function fetchPlayerMedia(videoId, helper) {
@@ -2341,7 +2347,18 @@ function fetchPlayerMedia(videoId, helper) {
   if (isEmptyRecord(data)) {
     throw new Error("红果 App 未返回所请求的分集播放信息");
   }
-  return selectAppMedia(appVideoModel(data));
+  return mediaFromModel(appVideoModel(data));
+}
+
+function mediaFromModel(model) {
+  try {
+    return selectAppMedia(model);
+  } catch (error) {
+    if (!error.noCompatibleMedia) {
+      throw error;
+    }
+    return fallbackMedia(model, error);
+  }
 }
 
 function appVideoModel(data) {
@@ -2437,6 +2454,162 @@ function selectAppMedia(model) {
     throw noMedia("已跳过不支持的编码");
   }
   throw noMedia("已跳过不支持的编码，其余线路没有播放地址");
+}
+
+function decodePlayUrl(encoded, seed) {
+  if (encoded === "" || seed === "") {
+    return encoded;
+  }
+  let key;
+  let raw;
+  try {
+    key = host.base64Decode(seed);
+    raw = host.base64Decode(encoded);
+  } catch (error) {
+    return encoded;
+  }
+  if (raw.length < 20 || raw[0] !== 0xa8 || raw[1] !== 0x00 || (raw.length - playUrlHeaderSize) % 16 !== 0) {
+    return encoded;
+  }
+  if (typeof host.sha512 !== "function") {
+    throw new Error("红果备用线路需要更新 App");
+  }
+  for (const salt of playUrlSalts) {
+    const address = decryptPlayUrl(raw, key, salt);
+    if (address !== "") {
+      return address;
+    }
+  }
+  throw failure("红果备用线路编码版本 " + (raw[2] | (raw[3] << 8)) + " 暂不支持", { unsupportedPlayUrl: true });
+}
+
+function decryptPlayUrl(raw, seed, salt) {
+  try {
+    const digest = host.sha512(concatBytes(host.sha512(seed), host.hexDecode(salt)));
+    const plain = host.aesCbcDecrypt(digest.subarray(0, 16), digest.subarray(16, 32), raw.subarray(playUrlHeaderSize));
+    const pad = plain[plain.length - 1];
+    if (pad < 1 || pad > 16 || pad > plain.length) {
+      return "";
+    }
+    for (let index = plain.length - pad; index < plain.length; index++) {
+      if (plain[index] !== pad) {
+        return "";
+      }
+    }
+    const address = host.utf8Decode(plain.subarray(0, plain.length - pad));
+    return playUrlPattern.test(address) ? address : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function fallbackEntries(data) {
+  const list = data.video_list;
+  if (Array.isArray(list)) {
+    return list;
+  }
+  if (isRecord(list)) {
+    return Object.keys(list).map((key) => list[key]);
+  }
+  return [];
+}
+
+function fallbackVariants(data) {
+  const seed = mapString(data, "key_seed");
+  const variants = [];
+  let versionError = null;
+  let decoded = 0;
+  for (const entry of fallbackEntries(data)) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+    const variant = {
+      gear_des_key: mapString(entry, "gear_des_key"),
+      video_meta: {
+        codec_type: mapString(entry, "codec_type"),
+        definition: mapString(entry, "definition"),
+        vwidth: mapString(entry, "vwidth"),
+        vheight: mapString(entry, "vheight"),
+      },
+    };
+    for (const key of ["main_url", "backup_url_1", "backup_url_2"]) {
+      let address;
+      try {
+        address = decodePlayUrl(mapString(entry, key), seed);
+      } catch (error) {
+        if (!error.unsupportedPlayUrl) {
+          throw error;
+        }
+        versionError = error;
+        continue;
+      }
+      if (address !== "") {
+        variant[key] = address;
+        decoded++;
+      }
+    }
+    const spade = mapString(entry, "spade_a");
+    const method = mapString(entry, "encryption_method");
+    if (spade !== "" || method !== "" || entry.encrypt === true) {
+      variant.encrypt_info = { spade_a: spade, encryption_method: method, encrypt: entry.encrypt === true };
+    }
+    variants.push(variant);
+  }
+  if (versionError !== null && decoded === 0) {
+    throw versionError;
+  }
+  return variants;
+}
+
+function fetchFallbackPlay(endpoint, codecType) {
+  const pattern = /([?&])codec_type=[^&]*/;
+  const address = pattern.test(endpoint)
+    ? endpoint.replace(pattern, "$1codec_type=" + codecType)
+    : endpoint + (endpoint.includes("?") ? "&" : "?") + "codec_type=" + codecType;
+  let response;
+  try {
+    response = host.fetch({
+      method: "GET", url: address, limit: responseLimit, timeoutMs: appRequestTimeoutMs,
+      followRedirects: true, anyStatus: true,
+      headers: { "User-Agent": playbackUserAgent, Accept: "application/json" },
+    });
+  } catch (error) {
+    throw new Error("红果备用线路请求失败：" + message(error));
+  }
+  if (response.status !== 200) {
+    throw new Error("红果备用线路 HTTP " + response.status);
+  }
+  let result;
+  try {
+    result = parseJson(response.body);
+  } catch (error) {
+    result = null;
+  }
+  const data = nested(result, "video_info", "data");
+  if (isEmptyRecord(data)) {
+    throw new Error("红果备用线路未返回有效数据");
+  }
+  return data;
+}
+
+function fallbackMedia(model, original) {
+  const endpoint = mapString(nested(model, "fallback_api"), "fallback_api");
+  if (endpoint === "") {
+    throw original;
+  }
+  let lastError = null;
+  for (const codecType of fallbackCodecTypes) {
+    try {
+      const data = fetchFallbackPlay(endpoint, codecType);
+      return selectAppMedia({ video_list: fallbackVariants(data), video_duration: mapString(data, "video_duration") });
+    } catch (error) {
+      if (!error.noCompatibleMedia) {
+        throw new Error(message(original) + "；备用线路：" + message(error));
+      }
+      lastError = error;
+    }
+  }
+  throw failure(message(original) + "；备用线路：" + message(lastError), { noCompatibleMedia: true });
 }
 
 function webMedia(seriesId, videoId) {

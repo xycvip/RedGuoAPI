@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/chaoliu",
+  "ref": "main",
+  "sourceTreeSha": "3e1c21923b52d5cd065aab1f33e3f98edc5fd546",
+  "files": {
+    "manifest.json": "c515430b6c0dd8adb80b275d86f78b4cf8f3b0a98d5fad3b887726e95bd810b1",
+    "main.js": "5170db1d7c33875dd9db0239645111b6c17ed8e3b69ac1b4a150dea1e7e75d79"
+  },
+  "importMethod": "source-copy"
+}
