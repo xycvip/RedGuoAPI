@@ -2,7 +2,7 @@ name: 上游模块自动同步
 
 on:
   schedule:
-    - cron: "22 */2 * * *"
+    - cron: "*/22 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -92,15 +92,11 @@ jobs:
                   "license": old.get("license", "not-declared"),
                   "repo": os.environ.get("GITHUB_REPOSITORY", "xycvip/RedGuoAPI"),
                   "path": f"{'modules' if category == 'standard' else 'modules-all'}/{module_id}",
-                  # 两种索引都记录当前实际同步文件的 SHA256。
                   "sha256": hashes
               }
-              # 保留旧索引中发布流程或未来扩展写入的字段，避免重建条目时丢失。
-              # 上游 manifest 和本次同步计算出的字段优先，旧值不能覆盖新数据。
               for key, value in old.items():
                   if key not in entry:
                       entry[key] = value
-              # adult 元数据完全沿用上游 manifest；上游未提供时不添加。
               if "adult" in manifest:
                   entry["adult"] = manifest["adult"]
               else:
@@ -114,7 +110,6 @@ jobs:
           Path("modules").mkdir(parents=True, exist_ok=True)
           Path("modules-all").mkdir(parents=True, exist_ok=True)
           try:
-              # 新仓库首次运行时初始化空索引，不要求迁移旧仓库模块数据。
               standard_path = Path("index.json")
               adult_path = Path("allindex.json")
               new_log_path = Path("new-modules.json")
@@ -194,7 +189,6 @@ jobs:
                       if adult_exists:
                           categories.append("adult")
                       if is_new:
-                          # 新模块默认进入全量包，等待人工核查。
                           categories = ["adult"]
 
                       files = {"manifest.json": manifest_bytes, "main.js": main_bytes}
@@ -209,7 +203,6 @@ jobs:
                       upstream_text = json.dumps(upstream_record, ensure_ascii=False, indent=2) + "\n"
                       changed_any = False
 
-                      # 两种分发形态分别同步：存在于哪个目录/索引，就更新哪个。
                       for category in categories:
                           root = Path("modules" if category == "standard" else "modules-all")
                           target = root / module_id
