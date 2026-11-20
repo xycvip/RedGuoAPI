@@ -82,10 +82,10 @@
         "main.js": "457f75b556cb0fb6f103b91fd9831f173ecbfdb266fa0bfe16f292d88a0a7b24"
       },
       "adult": false,
-      "tag": "hongguo-v1.0.6",
-      "releaseTag": "hongguo-v1.0.6",
-      "assetName": "hongguo-1.0.6.zip",
-      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hongguo-v1.0.6/hongguo-1.0.6.zip"
+      "tag": "hongguo-v1.0.7",
+      "releaseTag": "hongguo-v1.0.7",
+      "assetName": "hongguo-1.0.7.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/hongguo-v1.0.7/hongguo-1.0.7.zip"
     },
     {
       "id": "ikanbot",
@@ -115,10 +115,10 @@
         "main.js": "9d886e67b1e36ed0911b9b701292fe578d6de505fe2f0e4ac8bd6d5abc950767"
       },
       "adult": false,
-      "tag": "ikanbot-v1.0.4",
-      "releaseTag": "ikanbot-v1.0.4",
-      "assetName": "ikanbot-1.0.4.zip",
-      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.4/ikanbot-1.0.4.zip"
+      "tag": "ikanbot-v1.0.5",
+      "releaseTag": "ikanbot-v1.0.5",
+      "assetName": "ikanbot-1.0.5.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/ikanbot-v1.0.5/ikanbot-1.0.5.zip"
     }
   ]
 }
