@@ -47,6 +47,7 @@ const tagPanelCategory = "5000";
 const paths = {
   videoDetail: "/novel/player/video_detail/v1/",
   videoModel: "/novel/player/multi_video_model/player/v1",
+  videoTab: "/reading/bookapi/video_tab/multi_video_model/v1/",
   landpage: "/reading/distribution/category/landpage/v/",
   seriesPack: "/reading/distribution/book_pack_fields/inner_feed_detail/v1/",
   searchTab: "/reading/bookapi/search/tab/v/",
@@ -1466,6 +1467,7 @@ function appRequest(method, path, extra, payload, options) {
   const helper = options.helper === true;
   const deadline = options.deadline;
   const playback = path === paths.videoModel;
+  const signedV5 = playback || path === paths.videoTab;
   const signed = !comment && path !== paths.bookmallTab;
   let lane = "";
   let registerError = null;
@@ -1514,10 +1516,10 @@ function appRequest(method, path, extra, payload, options) {
     query._rticket = String(now);
     const rawQuery = encodeQuery(query);
     let requestUrl = address + "?" + rawQuery;
-    const headers = playback
+    const headers = signedV5
       ? { "User-Agent": playbackUserAgent, Accept: "application/json" }
       : { "User-Agent": appUserAgent, Accept: "application/json", "X-XS-From-Web": "0", "Sdk-Version": "2" };
-    if (playback) {
+    if (signedV5) {
       const prepared = signPlaybackV5(address, query, body === null ? null : host.utf8Encode(body), now);
       requestUrl = prepared.url;
       Object.assign(headers, prepared.headers);
@@ -2292,6 +2294,40 @@ function appMedia(videoId) {
 }
 
 function fetchAppMedia(videoId, helper) {
+  let tabError;
+  try {
+    return fetchTabMedia(videoId, helper);
+  } catch (error) {
+    if (error.noCompatibleMedia) {
+      throw error;
+    }
+    tabError = error;
+  }
+  try {
+    return fetchPlayerMedia(videoId, helper);
+  } catch (error) {
+    if (error.noCompatibleMedia) {
+      throw error;
+    }
+    throw new Error(message(tabError) + "；播放器接口：" + message(error));
+  }
+}
+
+function fetchTabMedia(videoId, helper) {
+  const query = {
+    video_id: videoId, video_id_type: "0", device_level: "1", need_all_video_definition: "1", need_mp4_align: "0",
+    use_os_player: "0", video_platform: "1024", source: "0", from_video_id: "",
+  };
+  const result = appRequest("GET", paths.videoTab, query, null, { helper });
+  const root = nested(result, "data");
+  const data = nested(nested(root, "video_model_data"), videoId);
+  if (isEmptyRecord(data)) {
+    throw new Error("红果 App 未返回所请求的分集播放信息");
+  }
+  return selectAppMedia(appVideoModel(data));
+}
+
+function fetchPlayerMedia(videoId, helper) {
   const payload = {
     biz_param: {
       detail_page_version: 0, device_level: 1, disable_digg_stat: false, disable_video_relate_book: false,
@@ -2305,6 +2341,10 @@ function fetchAppMedia(videoId, helper) {
   if (isEmptyRecord(data)) {
     throw new Error("红果 App 未返回所请求的分集播放信息");
   }
+  return selectAppMedia(appVideoModel(data));
+}
+
+function appVideoModel(data) {
   let model = isRecord(data.video_model) ? data.video_model : null;
   if (typeof data.video_model === "string" && data.video_model !== "") {
     let encoded = data.video_model;
@@ -2324,7 +2364,7 @@ function fetchAppMedia(videoId, helper) {
   if (isEmptyRecord(model) && anyList(data.video_list).length > 0) {
     model = { video_list: data.video_list, video_duration: data.video_duration, duration: data.duration };
   }
-  return selectAppMedia(model || {});
+  return model || {};
 }
 
 function selectAppMedia(model) {
@@ -4075,7 +4115,7 @@ function audioEntry(bookId) {
     }
     chapters.push({
       id: host.chapterId(drama.sourceId, itemId), source: host.source, title: mapString(item, "title") || "第" + (index + 1) + "章",
-      videoUrl: audioScheme + itemId, currentEpisode: index + 1,
+      videoUrl: audioScheme + itemId, currentEpisode: index + 1, mediaType: "audio",
     });
   });
   if (chapters.length === 0) {

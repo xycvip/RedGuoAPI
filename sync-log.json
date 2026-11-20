@@ -123,6 +123,48 @@
       ],
       "failed": [],
       "fatalErrors": []
+    },
+    {
+      "runAt": "2026-11-20T08:25:18Z",
+      "status": "completed",
+      "scannedRepositories": 18,
+      "moduleRepositories": 15,
+      "added": [],
+      "updated": [
+        "hongguo"
+      ],
+      "unchanged": [
+        "beabox",
+        "dsd",
+        "guipian",
+        "hanxiaoquan",
+        "heitao",
+        "huangguo-video",
+        "huangguoai",
+        "huangju",
+        "jinguoduanju",
+        "missav",
+        "sorani",
+        "yeguo",
+        "hanime1",
+        "ikanbot"
+      ],
+      "skipped": [
+        {
+          "id": ".github",
+          "reason": "非模块候选仓库"
+        },
+        {
+          "id": "template",
+          "reason": "非模块候选仓库"
+        },
+        {
+          "id": "index",
+          "reason": "非模块候选仓库"
+        }
+      ],
+      "failed": [],
+      "fatalErrors": []
     }
   ]
 }
