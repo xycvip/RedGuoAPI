@@ -163,6 +163,39 @@ jobs:
           def gh(*args, check=True):
               return subprocess.run(["gh", *args], text=True, capture_output=True, check=check)
 
+          def cleanup_old_releases(module_id, keep_tag):
+              # 先完整读取所有 Release，并确认当前版本存在；核验失败时绝不执行删除。
+              listed = gh(
+                  "api", "--paginate",
+                  f"repos/{repository}/releases?per_page=100",
+                  "--jq", ".[].tag_name",
+                  check=False
+              )
+              if listed.returncode != 0:
+                  print(f"[CLEANUP-ERROR] {module_id}: 获取 Release 列表失败，跳过清理：{listed.stderr.strip()}")
+                  return
+
+              tag_pattern = re.compile(rf"^{re.escape(module_id)}-v\\d+\\.\\d+\\.\\d+$")
+              module_tags = sorted({
+                  line.strip() for line in listed.stdout.splitlines()
+                  if tag_pattern.fullmatch(line.strip())
+              })
+              if keep_tag not in module_tags:
+                  print(f"[CLEANUP-SKIP] {module_id}: 未在 Release 列表中确认当前版本 {keep_tag}，为避免误删，保留所有历史版本")
+                  return
+
+              old_tags = [tag_name for tag_name in module_tags if tag_name != keep_tag]
+              deleted_count = 0
+              for old_tag in old_tags:
+                  deleted = gh("release", "delete", old_tag, "--cleanup-tag", "--yes", check=False)
+                  if deleted.returncode != 0:
+                      print(f"[CLEANUP-ERROR] {module_id}: 删除旧版本 {old_tag} 失败：{deleted.stderr.strip()}")
+                      continue
+                  deleted_count += 1
+                  print(f"[CLEANUP] {module_id}: 已删除旧版本 Release 和 Tag：{old_tag}")
+
+              print(f"[CLEANUP-DONE] {module_id}: 保留最新版 {keep_tag}，删除旧版本 {deleted_count}/{len(old_tags)} 个")
+
           for module_id in modules:
               try:
                   data = json.loads(full_catalog.read_text(encoding="utf-8"))
@@ -241,6 +274,7 @@ jobs:
                           print(f"[UNCHANGED] {module_id} {version}: Release、附件及文件指纹未变化；已检查两份索引")
                       else:
                           print(f"[REPAIRED] {module_id} {version}: {repaired_action}，发布信息已同步到两份索引")
+                      cleanup_old_releases(module_id, tag)
                       continue
 
                   # GitHub 上不存在该版本 Release：即使索引保留旧 tag/hash，也按首次发布创建。
@@ -271,6 +305,7 @@ jobs:
                   asset_url = f"https://github.com/{repository}/releases/download/{tag}/{quote(asset_filename, safe='')}"
                   write_release_metadata(module_id, version, tag, hashes, asset_filename, asset_url)
                   print(f"[PUBLISHED] {module_id} {version} -> {tag}；发布信息已同步到两份索引（精简索引中存在该模块时）")
+                  cleanup_old_releases(module_id, tag)
               except Exception as exc:
                   print(f"[ERROR] {module_id}: {type(exc).__name__}: {exc}")
 
