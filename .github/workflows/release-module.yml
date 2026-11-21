@@ -166,8 +166,8 @@ jobs:
           def cleanup_old_releases(module_id, keep_tag):
               # 先完整读取所有 Release，并确认当前版本存在；核验失败时绝不执行删除。
               listed = gh(
-                  "api", "--paginate",
-                  f"repos/{repository}/releases?per_page=100",
+                  "api", f"repos/{repository}/releases?per_page=100",
+                  "--paginate",
                   "--jq", ".[].tag_name",
                   check=False
               )
