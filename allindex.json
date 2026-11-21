@@ -677,7 +677,11 @@
         "manifest.json": "d58c2a7f69b764ebfef265cdd3693a5fd96b261c3938ad6c040d233bd27605d1",
         "main.js": "c1c0aa9d54e1825acfd4411b58e634d58e131a1f0a7266df6d52fce7324aac26"
       },
-      "adult": true
+      "adult": true,
+      "tag": "huangdou-v1.0.0",
+      "releaseTag": "huangdou-v1.0.0",
+      "assetName": "huangdou-1.0.0.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/huangdou-v1.0.0/huangdou-1.0.0.zip"
     },
     {
       "id": "huangguo-old",
@@ -711,7 +715,11 @@
         "manifest.json": "4453792710e2a8d661de20cd6cf869ed31daba993b594e7e66784bc95b6c75ca",
         "main.js": "7cb1e3431c6dcb2371627b761ae1de4da87478f2d6cc0cf86098c77d4a1d94f0"
       },
-      "adult": true
+      "adult": true,
+      "tag": "huangguo-old-v1.0.0",
+      "releaseTag": "huangguo-old-v1.0.0",
+      "assetName": "huangguo-old-1.0.0.zip",
+      "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/huangguo-old-v1.0.0/huangguo-old-1.0.0.zip"
     }
   ]
 }
