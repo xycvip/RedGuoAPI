@@ -9,6 +9,7 @@ on:
     paths:
       - "modules-all/**"
       - "allindex.json"
+      - ".github/workflows/release-module.yml"
   workflow_dispatch:
     inputs:
       module_id:
@@ -59,7 +60,8 @@ jobs:
                       m = re.match(r"^modules-all/([^/]+)/", path)
                       if m:
                           selected.add(m.group(1))
-                      elif path == "allindex.json":
+                      elif path in ("allindex.json", ".github/workflows/release-module.yml"):
+                          # 索引或发布工作流变更时：全量检查所有模块，确保历史 Release 也能被清理
                           data = json.loads(Path("allindex.json").read_text(encoding="utf-8"))
                           selected.update(x.get("id", "") for x in data.get("modules", []) if isinstance(x, dict))
           elif event == "workflow_dispatch":
