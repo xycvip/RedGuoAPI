@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/huangdou",
+  "ref": "main",
+  "sourceTreeSha": "397d41b76224956d44d8eacff7eb32ce05b94665",
+  "files": {
+    "manifest.json": "d58c2a7f69b764ebfef265cdd3693a5fd96b261c3938ad6c040d233bd27605d1",
+    "main.js": "c1c0aa9d54e1825acfd4411b58e634d58e131a1f0a7266df6d52fce7324aac26"
+  },
+  "importMethod": "source-copy"
+}

@@ -635,6 +635,83 @@
       "releaseTag": "chaoliu-v1.0.9",
       "assetName": "chaoliu-1.0.9.zip",
       "assetUrl": "https://github.com/xycvip/RedGuoAPI/releases/download/chaoliu-v1.0.9/chaoliu-1.0.9.zip"
+    },
+    {
+      "id": "huangdou",
+      "name": "黄豆",
+      "version": "1.0.0",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "ferncider.cc",
+        "onyxripple.cc",
+        "reeflumen.cc",
+        "niniharbor.top",
+        "halomeadow.top",
+        "larksummit.icu"
+      ],
+      "capabilities": [
+        "rankings",
+        "cover",
+        "metadata"
+      ],
+      "aliases": [
+        "tideember.cc",
+        "xqjurgek.top",
+        "ferncider.cc",
+        "onyxripple.cc",
+        "reeflumen.cc",
+        "niniharbor.top",
+        "halomeadow.top",
+        "larksummit.icu"
+      ],
+      "baseUrl": "https://ferncider.cc",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/huangdou",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/huangdou",
+      "sha256": {
+        "manifest.json": "d58c2a7f69b764ebfef265cdd3693a5fd96b261c3938ad6c040d233bd27605d1",
+        "main.js": "c1c0aa9d54e1825acfd4411b58e634d58e131a1f0a7266df6d52fce7324aac26"
+      },
+      "adult": true
+    },
+    {
+      "id": "huangguo-old",
+      "name": "黄果旧版",
+      "version": "1.0.0",
+      "runtime": "js",
+      "api": 1,
+      "hosts": [
+        "d2pypzndaqisk.cloudfront.net",
+        "dr6skssi3nxbk.cloudfront.net",
+        "d18ka9rqpfd3lo.cloudfront.net",
+        "d37n0wjehmw08f.cloudfront.net",
+        "sjljsla.lkkwip.cn",
+        "pic.zdmhyg.cn",
+        "zzzznnn.lkkwip.cn",
+        "pic.tuafjz.cn"
+      ],
+      "capabilities": [
+        "cover"
+      ],
+      "aliases": [],
+      "baseUrl": "https://d2pypzndaqisk.cloudfront.net",
+      "allowEmptyCatalog": false,
+      "upstream": "https://github.com/guoapp-modules/huangguo-old",
+      "upstreamRef": "main",
+      "sourceImport": "imported",
+      "license": "not-declared",
+      "repo": "xycvip/RedGuoAPI",
+      "path": "modules-all/huangguo-old",
+      "sha256": {
+        "manifest.json": "4453792710e2a8d661de20cd6cf869ed31daba993b594e7e66784bc95b6c75ca",
+        "main.js": "7cb1e3431c6dcb2371627b761ae1de4da87478f2d6cc0cf86098c77d4a1d94f0"
+      },
+      "adult": true
     }
   ]
 }

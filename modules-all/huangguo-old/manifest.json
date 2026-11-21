@@ -1,0 +1,15 @@
+{
+  "id": "huangguo-old",
+  "name": "黄果旧版",
+  "version": "1.0.0",
+  "description": "旧 API 剧库",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["d2pypzndaqisk.cloudfront.net", "dr6skssi3nxbk.cloudfront.net", "d18ka9rqpfd3lo.cloudfront.net", "d37n0wjehmw08f.cloudfront.net", "sjljsla.lkkwip.cn", "pic.zdmhyg.cn", "zzzznnn.lkkwip.cn", "pic.tuafjz.cn"],
+  "capabilities": ["cover"],
+  "group": "huangguo",
+  "groupName": "黄果",
+  "entryName": "旧版",
+  "baseUrl": "https://d2pypzndaqisk.cloudfront.net"
+}

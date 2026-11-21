@@ -118,6 +118,24 @@
       "upstream": "guoapp-modules/chaoliu",
       "sourceTreeSha": "3e1c21923b52d5cd065aab1f33e3f98edc5fd546",
       "reviewStatus": "pending"
+    },
+    {
+      "id": "huangdou",
+      "name": "黄豆",
+      "version": "1.0.0",
+      "importedAt": "2026-11-21",
+      "upstream": "guoapp-modules/huangdou",
+      "sourceTreeSha": "397d41b76224956d44d8eacff7eb32ce05b94665",
+      "reviewStatus": "pending"
+    },
+    {
+      "id": "huangguo-old",
+      "name": "黄果旧版",
+      "version": "1.0.0",
+      "importedAt": "2026-11-21",
+      "upstream": "guoapp-modules/huangguo-old",
+      "sourceTreeSha": "25abad55c847fbf30ea58aaa81439195980ee512",
+      "reviewStatus": "pending"
     }
   ]
 }

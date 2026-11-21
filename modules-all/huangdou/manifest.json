@@ -1,0 +1,20 @@
+{
+  "id": "huangdou",
+  "name": "黄豆",
+  "version": "1.0.0",
+  "description": "精选短剧",
+  "runtime": "js",
+  "api": 1,
+  "adult": true,
+  "hosts": ["ferncider.cc", "onyxripple.cc", "reeflumen.cc", "niniharbor.top", "halomeadow.top", "larksummit.icu"],
+  "aliases": ["tideember.cc", "xqjurgek.top", "ferncider.cc", "onyxripple.cc", "reeflumen.cc", "niniharbor.top", "halomeadow.top", "larksummit.icu"],
+  "baseUrl": "https://ferncider.cc",
+  "capabilities": ["rankings", "cover", "metadata"],
+  "rankings": [
+    { "id": "huangdou-all", "name": "总榜", "description": "黄豆短剧总榜，保留站点返回的顺序。" },
+    { "id": "huangdou-mogai", "name": "魔改榜", "description": "黄豆站点魔改榜。" },
+    { "id": "huangdou-search", "name": "搜索榜", "description": "黄豆站点搜索榜。" },
+    { "id": "huangdou-favorite", "name": "收藏榜", "description": "黄豆站点收藏榜。" },
+    { "id": "huangdou-finish", "name": "完结榜", "description": "黄豆站点完结榜。" }
+  ]
+}

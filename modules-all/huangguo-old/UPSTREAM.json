@@ -1,0 +1,10 @@
+{
+  "repository": "guoapp-modules/huangguo-old",
+  "ref": "main",
+  "sourceTreeSha": "25abad55c847fbf30ea58aaa81439195980ee512",
+  "files": {
+    "manifest.json": "4453792710e2a8d661de20cd6cf869ed31daba993b594e7e66784bc95b6c75ca",
+    "main.js": "7cb1e3431c6dcb2371627b761ae1de4da87478f2d6cc0cf86098c77d4a1d94f0"
+  },
+  "importMethod": "source-copy"
+}
