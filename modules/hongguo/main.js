@@ -4385,7 +4385,11 @@ const thlAdapter = (() => {
     utf8(value) { return host.utf8Encode(String(value)); },
     md5(value) { return host.md5(value); },
     decryptBlock(data, key) {
-      return host.aesCbcDecrypt(key, new Uint8Array(16), data);
+      const block = data instanceof Uint8Array ? data : new Uint8Array(data);
+      if (block.length !== 16) throw new Error("THL AES block must be exactly 16 bytes");
+      // THL uses AES-ECB block decryption. A one-block CBC decrypt with a zero IV
+      // is equivalent to ECB for that block; never decrypt multiple blocks as CBC.
+      return host.aesCbcDecrypt(key, new Uint8Array(16), block);
     },
   };
   if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== "function") {
