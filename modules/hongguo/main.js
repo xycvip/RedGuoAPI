@@ -4375,9 +4375,9 @@ module.exports = {
 
 
 /*
- * THL -> RedGuoAPI host adapter.
- * Upstream business/signing implementation is retained in the isolated factory below.
- * Network, byte, crypto and persistence primitives are bridged to RedGuoAPI host.*.
+ * Native RedGuoAPI CommonJS provider implementation.
+ * Network, byte, crypto and persistence primitives use the RedGuoAPI host.* contract.
+ * Upstream source attribution and license notices are retained below.
  */
 const hongguoProvider = (() => {
   const crypto = {
@@ -4433,7 +4433,7 @@ const hongguoProvider = (() => {
   }
   /**
  * 红果官方接口业务实现。
- * 已改为 RedGuoAPI CommonJS 模块内部 API，不依赖 Spider / CatVod / CatPawOpen 运行时。
+ * 以 CommonJS provider API 暴露，不依赖外部插件框架运行时。
  */
 
 const meta = {
