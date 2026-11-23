@@ -4379,7 +4379,7 @@ module.exports = {
  * Upstream business/signing implementation is retained in the isolated factory below.
  * Network, byte, crypto and persistence primitives are bridged to RedGuoAPI host.*.
  */
-const thlAdapter = (() => {
+const hongguoProvider = (() => {
   const crypto = {
     base64(value) { return host.base64Decode(String(value)); },
     utf8(value) { return host.utf8Encode(String(value)); },
@@ -4432,9 +4432,8 @@ const thlAdapter = (() => {
     };
   }
   /**
- * 官方免费短剧 CatPawOpen Spider (hongguo.js)
- * 适配 CatPawOpen / CatVodOpen 标准规范 v1.0.4
- * 支持官方 App API 与 Web 路由双轨容错解析
+ * 红果官方接口业务实现。
+ * 已改为 RedGuoAPI CommonJS 模块内部 API，不依赖 Spider / CatVod / CatPawOpen 运行时。
  */
 
 const meta = {
@@ -5220,7 +5219,7 @@ async function play(flag, id, flags) {
   return { parse: 0, url: '', header: {}, error: 'MISSING_EPISODE' };
 }
 
-var spider = {
+var providerApi = {
   meta: meta,
   init: init,
   home: home,
@@ -6528,8 +6527,8 @@ Public License instead of this License.  But first, please read
 
 */
 (function () {
-  const existingPlay = spider.play;
-  spider.play = async function (flag, id, flags) {
+  const existingPlay = providerApi.play;
+  providerApi.play = async function (flag, id, flags) {
     const target = String(id || '').replace(/^hongguo:/, '');
     const flagValues = Array.isArray(flags) ? flags : [];
     const seriesId = String(flagValues.find(value => value && typeof value === 'object' && value.seriesId)?.seriesId || '');
@@ -6544,7 +6543,7 @@ Public License instead of this License.  But first, please read
       let exactId = episode && String(episode.vid || episode.video_id || "");
       if (!/^\d+$/.test(exactId || "")) {
         try {
-          const fullDetail = await spider.detail(indexed[1]);
+          const fullDetail = await providerApi.detail(indexed[1]);
           const vod = fullDetail && Array.isArray(fullDetail.list) && fullDetail.list[0];
           const playUrl = (vod && vod.vod_play_url) || "";
           if (playUrl) {
@@ -6567,7 +6566,7 @@ Public License instead of this License.  But first, please read
               if (parts.length >= 2) resolvedUrl = parts[1];
             }
             if (resolvedUrl && resolvedUrl !== target && !/^\d+[/_]\d{1,5}$/.test(resolvedUrl)) {
-              return spider.play(flag, resolvedUrl, flags);
+              return providerApi.play(flag, resolvedUrl, flags);
             }
             const exactVidMatch = /\/player\/[^/?#]+\/(\d+)/.exec(resolvedUrl || "") || /^(\d{10,})$/.exec(resolvedUrl || "");
             if (exactVidMatch) {
@@ -6582,7 +6581,7 @@ Public License instead of this License.  But first, please read
         }
       }
       if (!/^\d+$/.test(exactId || "")) return { parse: 0, url: "", header: {}, error: "MISSING_EPISODE" };
-      return spider.play(flag, BASE_URL + "/player/" + indexed[1] + "/" + exactId, flags);
+      return providerApi.play(flag, BASE_URL + "/player/" + indexed[1] + "/" + exactId, flags);
     }
     const vid = match[2];
     const danmakuId = match[1] ? 'hongguo:' + match[1] + ':' + vid : '';
@@ -6661,7 +6660,7 @@ Public License instead of this License.  But first, please read
 
 (function () {
   const searches = new Map();
-  spider.search = async function (word, quick, page) {
+  providerApi.search = async function (word, quick, page) {
     const query = String(word || '').trim().slice(0, 100);
     const pg = Math.max(1, Number.parseInt(page, 10) || 1);
     if (!query) return { page: pg, pagecount: pg, limit: 10, total: 0, list: [] };
@@ -6675,7 +6674,7 @@ Public License instead of this License.  But first, please read
     if (state.end !== null && pg > state.end) return { page: pg, pagecount: state.end, limit: 10, total: 0, list: [] };
     if (!state.cursors.has(pg) && !state.pages.has(pg)) {
       if (pg !== 2) throw new Error('搜索游标已过期，请从第一页重新搜索');
-      await spider.search(query, quick, 1);
+      await providerApi.search(query, quick, 1);
       state = searches.get(query);
     }
     if (!state.pages.has(pg)) {
@@ -6693,7 +6692,7 @@ Public License instead of this License.  But first, please read
   };
 })();
 
-spider.danmaku = function (id, startMs, durationMs) {
+providerApi.danmaku = function (id, startMs, durationMs) {
   return HongguoApp.fetchAppDanmakuPage(id, startMs, durationMs);
 };
 
@@ -6863,8 +6862,8 @@ spider.danmaku = function (id, startMs, durationMs) {
     return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
   }
 
-  const legacyHome = spider.home;
-  const legacyCategory = spider.category;
+  const legacyHome = providerApi.home;
+  const legacyCategory = providerApi.category;
   const discoveryGenres = ['all', 'playlet', 'motion_comic', 'ai_playlet'];
 
   let cachedDiscoveryTab = null;
@@ -6885,7 +6884,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     return cachedDiscoveryTab;
   }
 
-  spider.home = async function (filter) {
+  providerApi.home = async function (filter) {
     if (!filter) return legacyHome(false);
     const { choices } = await discoveryTab();
     return { class: choices.filter(item => discoveryGenres.includes(item.selector_item_id)).map(item => ({
@@ -6893,7 +6892,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     })), filters: {} };
   };
 
-  spider.category = async function (tid, page, filter, extend) {
+  providerApi.category = async function (tid, page, filter, extend) {
     const aliases = { '': 'all', all: 'all', short_play: 'all', 'real-drama': 'playlet',
       'comic-drama': 'motion_comic', comic: 'motion_comic', 'ai-drama': 'ai_playlet',
       'app:theater:8': 'all', 'app:theater:38': 'playlet', 'app:theater:32': 'motion_comic' };
@@ -6921,7 +6920,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     });
   };
 
-  spider.suggestions = async function (word) {
+  providerApi.suggestions = async function (word) {
     const query = text(word).slice(0, 100);
     const common = { bookstore_tab: 16, tab_name: 'feed', search_source: 1, user_is_login: globalThis.__hongguoAccountActive ? 1 : 0 };
     const response = await api(query ? '/reading/bookapi/search/suggest/v' : '/reading/bookapi/search/cue/v',
@@ -6940,7 +6939,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
   let cachedRankingBoards = null;
   let cachedRankingBoardsTime = 0;
-  spider.rankingBoards = async function () {
+  providerApi.rankingBoards = async function () {
     if (cachedRankingBoards && Date.now() - cachedRankingBoardsTime < 15 * 60 * 1000) {
       return cachedRankingBoards;
     }
@@ -6964,7 +6963,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     return cachedRankingBoards;
   };
 
-  spider.rankings = function (board, page) {
+  providerApi.rankings = function (board, page) {
     const match = /^hongguo-app:(all|human|comic_series_rank|ai_playlet):([a-z0-9_]{1,80})$/.exec(text(board));
     if (!match) throw failure('榜单已更新，请重新打开榜单列表', 'INVALID_BOARD');
     return rankedPage(match[1], match[2], page, text(board));
@@ -6982,7 +6981,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     });
   };
 
-  spider.recommendations = function (genre, page) {
+  providerApi.recommendations = function (genre, page) {
     const key = text(genre);
     if (['ai_series', 'ai-drama', 'AI 剧', 'AI剧'].includes(key)) {
       return rankedPage('ai_playlet', 'ai_playlet_hot_sc', page, 'recommendations:ai');
@@ -7003,7 +7002,7 @@ spider.danmaku = function (id, startMs, durationMs) {
   const text = value => value == null ? '' : String(value).trim();
   const integer = value => Math.max(0, Number.parseInt(value, 10) || 0);
   const failure = code => Object.assign(new Error('官方系列剧列表暂不可用'), { code });
-  spider.seriesSeasons = async function (rawId) {
+  providerApi.seriesSeasons = async function (rawId) {
     const id = text(rawId).replace(/^hongguo:/, '');
     if (!/^[1-9]\d{9,29}$/.test(id)) throw failure('INVALID_SERIES_ID');
     const api = HongguoApp.fetchAppDiscoveryRaw;
@@ -7067,7 +7066,7 @@ spider.danmaku = function (id, startMs, durationMs) {
     }
     return rows;
   }
-  spider.feed = async function (rawPage, rawScope) {
+  providerApi.feed = async function (rawPage, rawScope) {
     const page = Math.max(1, number(rawPage));
     const scope = text(rawScope).slice(0, 160);
     const initialOffset = Math.max(0, number((scope.match(/_(\d+)$/) || [])[1]));
@@ -7203,7 +7202,7 @@ spider.danmaku = function (id, startMs, durationMs) {
   };
 })();
 
-spider.accountRequest = async function (action, payload) {
+providerApi.accountRequest = async function (action, payload) {
   payload = payload || {};
   if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
@@ -7241,7 +7240,7 @@ spider.accountRequest = async function (action, payload) {
     headers, ...(form ? { body: Object.keys(form).map(key => encodeURIComponent(key) + '=' + encodeURIComponent(form[key])).join('&') } : {}) };
 };
 
-spider.accountParse = function (action, text) {
+providerApi.accountParse = function (action, text) {
   const response = safeJsonParse(text);
   if (!response || typeof response !== 'object') throw new Error('账号接口返回无效数据');
   const data = response.data;
@@ -7638,36 +7637,36 @@ spider.accountParse = function (action, text) {
 
   return {
     meta, init, home, category, detail, play,
-    spider,
+    providerApi,
     app: HongguoApp,
   };
 })();
-async function thlSearch(query, quick, page) {
-  return thlAdapter.spider.search(String(query || ""), quick, page);
+async function providerSearch(query, quick, page) {
+  return hongguoProvider.providerApi.search(String(query || ""), quick, page);
 }
-async function thlSearchRaw(query, options) {
-  return thlAdapter.app.fetchAppSearchPage(String(query || ""), options || {});
+async function providerSearchRaw(query, options) {
+  return hongguoProvider.app.fetchAppSearchPage(String(query || ""), options || {});
 }
-async function thlDetailRaw(seriesId) {
-  return thlAdapter.app.fetchAppDetailRaw(String(seriesId || ""));
+async function providerDetailRaw(seriesId) {
+  return hongguoProvider.app.fetchAppDetailRaw(String(seriesId || ""));
 }
-async function thlPlayUrl(videoId, options) {
-  return thlAdapter.app.fetchAppPlayUrl(String(videoId || ""), options || {});
+async function providerPlayUrl(videoId, options) {
+  return hongguoProvider.app.fetchAppPlayUrl(String(videoId || ""), options || {});
 }
-async function thlDanmaku(episodeId, startMs, durationMs) {
-  return thlAdapter.spider.danmaku(String(episodeId || ""), Number(startMs), Number(durationMs));
+async function providerDanmaku(episodeId, startMs, durationMs) {
+  return hongguoProvider.providerApi.danmaku(String(episodeId || ""), Number(startMs), Number(durationMs));
 }
-async function thlDiscovery(path, params) {
-  return thlAdapter.app.fetchAppDiscoveryRaw(String(path || ""), params || {});
+async function providerDiscovery(path, params) {
+  return hongguoProvider.app.fetchAppDiscoveryRaw(String(path || ""), params || {});
 }
-async function thlAccountRequest(action, payload) {
-  return thlAdapter.spider.accountRequest(String(action || "profile"), payload || {});
+async function providerAccountRequest(action, payload) {
+  return hongguoProvider.providerApi.accountRequest(String(action || "profile"), payload || {});
 }
-function thlAccountParse(action, body) {
-  return thlAdapter.spider.accountParse(String(action || ""), String(body || ""));
+function providerAccountParse(action, body) {
+  return hongguoProvider.providerApi.accountParse(String(action || ""), String(body || ""));
 }
-async function thlAccount(action, payload) {
-  const request = await thlAccountRequest(action, payload);
+async function providerAccount(action, payload) {
+  const request = await providerAccountRequest(action, payload);
   const ticket = host.reserve({ url: request.url });
   const response = host.fetch({
     method: request.method,
@@ -7681,27 +7680,50 @@ async function thlAccount(action, payload) {
     anyStatus: true,
   });
   if (Number(response.status) !== 200) throw new Error("THL 账号接口 HTTP " + response.status);
-  return thlAccountParse(action, response.body);
+  return providerAccountParse(action, response.body);
 }
-async function thlInit(ext) { return thlAdapter.spider.init(ext); }
-async function thlHome(filter) { return thlAdapter.spider.home(filter); }
-async function thlCategory(id, page, filter, extend) { return thlAdapter.spider.category(id, page, filter, extend); }
-async function thlDetail(id) { return thlAdapter.spider.detail(id); }
-async function thlPlay(flag, id, flags) { return thlAdapter.spider.play(flag, id, flags); }
-async function thlSuggestions(word) { return thlAdapter.spider.suggestions(word); }
-async function thlRankingBoards() { return thlAdapter.spider.rankingBoards(); }
-async function thlRankings(board, page) { return thlAdapter.spider.rankings(board, page); }
-async function thlRecommendations(genre, page) { return thlAdapter.spider.recommendations(genre, page); }
-async function thlSeriesSeasons(id) { return thlAdapter.spider.seriesSeasons(id); }
-async function thlFeed(page, scope) { return thlAdapter.spider.feed(page, scope); }
+async function providerInit(ext) { return hongguoProvider.providerApi.init(ext); }
+async function providerHome(filter) { return hongguoProvider.providerApi.home(filter); }
+async function providerCategory(id, page, filter, extend) { return hongguoProvider.providerApi.category(id, page, filter, extend); }
+async function providerDetail(id) { return hongguoProvider.providerApi.detail(id); }
+async function providerPlay(flag, id, flags) { return hongguoProvider.providerApi.play(flag, id, flags); }
+async function providerSuggestions(word) { return hongguoProvider.providerApi.suggestions(word); }
+async function providerRankingBoards() { return hongguoProvider.providerApi.rankingBoards(); }
+async function providerRankings(board, page) { return hongguoProvider.providerApi.rankings(board, page); }
+async function providerRecommendations(genre, page) { return hongguoProvider.providerApi.recommendations(genre, page); }
+async function providerSeriesSeasons(id) { return hongguoProvider.providerApi.seriesSeasons(id); }
+async function providerFeed(page, scope) { return hongguoProvider.providerApi.feed(page, scope); }
 
 Object.assign(module.exports, {
-  thl: thlAdapter,
-  thlMeta: thlAdapter.meta,
-  thlInit, thlHome, thlCategory, thlDetail, thlPlay,
-  thlSearch, thlSearchRaw, thlDetailRaw, thlPlayUrl, thlDanmaku,
-  thlDiscovery, thlSuggestions, thlRankingBoards, thlRankings,
-  thlRecommendations, thlSeriesSeasons, thlFeed,
-  thlAccountRequest, thlAccountParse, thlAccount,
-  thlResetGuestSession: () => thlAdapter.app.resetGuestSession(),
+  provider: {
+    meta: hongguoProvider.meta,
+    init: providerInit,
+    home: providerHome,
+    category: providerCategory,
+    detail: providerDetail,
+    play: providerPlay,
+    search: providerSearch,
+    suggestions: providerSuggestions,
+    rankingBoards: providerRankingBoards,
+    rankings: providerRankings,
+    recommendations: providerRecommendations,
+    seriesSeasons: providerSeriesSeasons,
+    feed: providerFeed,
+    danmaku: providerDanmaku,
+    accountRequest: providerAccountRequest,
+    accountParse: providerAccountParse,
+    account: providerAccount,
+    searchRaw: providerSearchRaw,
+    detailRaw: providerDetailRaw,
+    playUrl: providerPlayUrl,
+    discovery: providerDiscovery,
+    resetGuestSession: () => hongguoProvider.app.resetGuestSession(),
+  },
+  providerMeta: hongguoProvider.meta,
+  providerInit, providerHome, providerCategory, providerDetail, providerPlay,
+  providerSearch, providerSearchRaw, providerDetailRaw, providerPlayUrl, providerDanmaku,
+  providerDiscovery, providerSuggestions, providerRankingBoards, providerRankings,
+  providerRecommendations, providerSeriesSeasons, providerFeed,
+  providerAccountRequest, providerAccountParse, providerAccount,
+  providerResetGuestSession: () => hongguoProvider.app.resetGuestSession(),
 });
