@@ -7634,10 +7634,14 @@ spider.accountParse = function (action, text) {
 
   return {
     meta, init, home, category, detail, play,
+    spider,
     app: HongguoApp,
   };
 })();
-async function thlSearch(query, options) {
+async function thlSearch(query, quick, page) {
+  return thlAdapter.spider.search(String(query || ""), quick, page);
+}
+async function thlSearchRaw(query, options) {
   return thlAdapter.app.fetchAppSearchPage(String(query || ""), options || {});
 }
 async function thlDetailRaw(seriesId) {
@@ -7647,13 +7651,16 @@ async function thlPlayUrl(videoId, options) {
   return thlAdapter.app.fetchAppPlayUrl(String(videoId || ""), options || {});
 }
 async function thlDanmaku(episodeId, startMs, durationMs) {
-  return thlAdapter.app.fetchAppDanmakuPage(String(episodeId || ""), Number(startMs), Number(durationMs));
+  return thlAdapter.spider.danmaku(String(episodeId || ""), Number(startMs), Number(durationMs));
 }
 async function thlDiscovery(path, params) {
   return thlAdapter.app.fetchAppDiscoveryRaw(String(path || ""), params || {});
 }
 async function thlAccountRequest(action, payload) {
-  return thlAdapter.app.buildAccountRequest(String(action || "profile"), payload || {});
+  return thlAdapter.spider.accountRequest(String(action || "profile"), payload || {});
+}
+function thlAccountParse(action, body) {
+  return thlAdapter.spider.accountParse(String(action || ""), String(body || ""));
 }
 async function thlAccount(action, payload) {
   const request = await thlAccountRequest(action, payload);
@@ -7670,20 +7677,27 @@ async function thlAccount(action, payload) {
     anyStatus: true,
   });
   if (Number(response.status) !== 200) throw new Error("THL 账号接口 HTTP " + response.status);
-  return parseJson(response.body);
+  return thlAccountParse(action, response.body);
 }
-async function thlInit(ext) { return thlAdapter.init(ext); }
-async function thlHome(filter) { return thlAdapter.home(filter); }
-async function thlCategory(id, page, filter, extend) { return thlAdapter.category(id, page, filter, extend); }
-async function thlDetail(id) { return thlAdapter.detail(id); }
-async function thlPlay(flag, id, flags) { return thlAdapter.play(flag, id, flags); }
-
+async function thlInit(ext) { return thlAdapter.spider.init(ext); }
+async function thlHome(filter) { return thlAdapter.spider.home(filter); }
+async function thlCategory(id, page, filter, extend) { return thlAdapter.spider.category(id, page, filter, extend); }
+async function thlDetail(id) { return thlAdapter.spider.detail(id); }
+async function thlPlay(flag, id, flags) { return thlAdapter.spider.play(flag, id, flags); }
+async function thlSuggestions(word) { return thlAdapter.spider.suggestions(word); }
+async function thlRankingBoards() { return thlAdapter.spider.rankingBoards(); }
+async function thlRankings(board, page) { return thlAdapter.spider.rankings(board, page); }
+async function thlRecommendations(genre, page) { return thlAdapter.spider.recommendations(genre, page); }
+async function thlSeriesSeasons(id) { return thlAdapter.spider.seriesSeasons(id); }
+async function thlFeed(page, scope) { return thlAdapter.spider.feed(page, scope); }
 
 Object.assign(module.exports, {
   thl: thlAdapter,
   thlMeta: thlAdapter.meta,
   thlInit, thlHome, thlCategory, thlDetail, thlPlay,
-  thlSearch, thlDetailRaw, thlPlayUrl, thlDanmaku,
-  thlDiscovery, thlAccountRequest, thlAccount,
+  thlSearch, thlSearchRaw, thlDetailRaw, thlPlayUrl, thlDanmaku,
+  thlDiscovery, thlSuggestions, thlRankingBoards, thlRankings,
+  thlRecommendations, thlSeriesSeasons, thlFeed,
+  thlAccountRequest, thlAccountParse, thlAccount,
   thlResetGuestSession: () => thlAdapter.app.resetGuestSession(),
 });
