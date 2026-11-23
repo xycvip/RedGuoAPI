@@ -4400,9 +4400,11 @@ const thlAdapter = (() => {
   async function fetch(url, options) {
     options = options || {};
     const address = String(url);
+    const ticket = host.reserve({ url: address });
     const response = host.fetch({
       method: options.method || "GET",
       url: address,
+      ticket,
       headers: options.headers || {},
       ...(options.body === undefined ? {} : { body: String(options.body) }),
       limit: /search\/tab|bookmall\/(?:tab|cell\/change)|video_detail\/v1/.test(address) ? 12 * 1024 * 1024 : 2 * 1024 * 1024,
@@ -7655,9 +7657,11 @@ async function thlAccountRequest(action, payload) {
 }
 async function thlAccount(action, payload) {
   const request = await thlAccountRequest(action, payload);
+  const ticket = host.reserve({ url: request.url });
   const response = host.fetch({
     method: request.method,
     url: request.url,
+    ticket,
     headers: request.headers,
     ...(request.body === undefined ? {} : { body: request.body }),
     limit: 4 * 1024 * 1024,
