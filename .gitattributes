@@ -1,0 +1,13 @@
+# 换行符统一用 LF。Windows 上传若被转成 CRLF，sha256 会变，
+# 客户端会表现为「每次启动都提示更新、下载后校验不过」的死循环。
+* text=auto eol=lf
+
+# 脚本是字节级发布产物，禁止任何换行/编码转换。
+script/main.js -text
+dist/hongguoTV/*.js -text
+
+# 配置与清单仍按文本处理，方便查看 diff。
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf

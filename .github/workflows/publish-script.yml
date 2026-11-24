@@ -1,0 +1,39 @@
+name: 发布客户端脚本
+
+# 只要 script/main.js 被覆盖，就自动重算 sha256 并生成 dist；
+# dist 的改动不会再次触发本工作流（paths 只匹配 script/main.js）。
+on:
+  push:
+    paths:
+      - "script/main.js"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-script
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: 发布脚本到 dist
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      - name: 生成 dist
+        run: python3 .github/scripts/build_dist.py
+
+      - name: 提交
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist
+          if git diff --staged --quiet; then
+            echo "内容未变化，无需提交"
+            exit 0
+          fi
+          git commit -m "dist: $(date -u +%Y%m%dT%H%M%SZ)"
+          git push
