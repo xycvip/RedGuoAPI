@@ -3881,6 +3881,10 @@ spider.accountParse = function (action, text) {
       // vendor 只有短剧；听书/小说仍走原生。这里给空页 + 提示，避免界面弹错误框。
       return { items: [], hasMore: false, warning: "听书/小说分类由原生侧提供，热更新脚本只负责短剧目录" };
     }
+    // 分类切换缓存：QuickJS 每次调用可能重建，必须使用宿主持久化缓存。
+    var cacheKey = "catalog:page:v1:" + key + ":" + page;
+    var cached = cacheGet(cacheKey);
+    if (cached !== null) return cached;
     var typeId = GENRE_OF[key] || "app:discover:all";
     var result = await spider.category(typeId, page, {}, {});
     var items = dramas(listOf(result), key === "" ? "短剧" : "");
@@ -3889,7 +3893,9 @@ spider.accountParse = function (action, text) {
     if (items.length === 0 && !hasMore) {
       hasMore = false;
     }
-    return { items: items, hasMore: hasMore };
+    var output = { items: items, hasMore: hasMore };
+    cacheSet(cacheKey, output, 45 * 1000);
+    return output;
   }
 
   // ---------------------------------------------------------------- 搜索 ----
@@ -4094,6 +4100,10 @@ spider.accountParse = function (action, text) {
     if (id === "") {
       throw failure("未知的红果榜单", "INVALID_BOARD");
     }
+    // 按榜单 ID + 页码隔离缓存，真人剧/漫剧及不同榜单不会串数据。
+    var cacheKey = "ranking:page:v1:" + id + ":" + page;
+    var cached = cacheGet(cacheKey);
+    if (cached !== null) return cached;
     var result = await spider.rankings(id, page);
     var items = dramas(listOf(result));
     var pageCount = Math.max(1, Math.floor(Number(result && result.pagecount) || page));
@@ -4102,7 +4112,9 @@ spider.accountParse = function (action, text) {
     var hasMore = result && typeof result.hasMore === "boolean"
       ? result.hasMore
       : page < pageCount;
-    return { items: items, hasMore: items.length > 0 && hasMore };
+    var output = { items: items, hasMore: items.length > 0 && hasMore };
+    cacheSet(cacheKey, output, 60 * 1000);
+    return output;
   }
 
   // ---------------------------------------------------------------- 系列 ----
@@ -5113,18 +5125,22 @@ spider.accountParse = function (action, text) {
           try {
             var payload;
             if (group === 0) {
-              // v1：第 1 页先取筛选面板，再取内容并合并 selector_rows。
-              var panelData = null;
+              // v1：第 1 页的筛选面板与内容请求互不依赖，并行发送减少一次网络往返等待。
               if (page === 1) {
-                panelData = await requestOnce(HOSTS[h], endpoint, panelBody(type, selected), { lc: "101" });
-              }
-              var content = await requestOnce(HOSTS[h], endpoint,
-                contentBody(type, selected, cursor, session.shown, page, session), { lc: "101" });
-              if (panelData) {
+                var pair = await Promise.all([
+                  requestOnce(HOSTS[h], endpoint, panelBody(type, selected), { lc: "101" }),
+                  requestOnce(HOSTS[h], endpoint,
+                    contentBody(type, selected, cursor, session.shown, page, session), { lc: "101" })
+                ]);
+                var panelData = pair[0];
+                var content = pair[1];
                 var rows = Array.isArray(panelData.data.selector_rows) ? panelData.data.selector_rows : [];
                 content.data.selector_rows = rows;
+                payload = content;
+              } else {
+                payload = await requestOnce(HOSTS[h], endpoint,
+                  contentBody(type, selected, cursor, session.shown, page, session), { lc: "101" });
               }
-              payload = content;
             } else {
               // legacy v：第 1 页直接带 need_selector_panel，一次取回面板+内容。
               payload = await requestOnce(HOSTS[h], endpoint,
@@ -5189,6 +5205,12 @@ spider.accountParse = function (action, text) {
     page = integer(page, 1);
     if (page < 1 || page > 100) throw failure("剧院分页参数无效", "INVALID_PAGE");
     var key = sessionKey(text(type), selected || {});
+    // 首屏短缓存用于分类来回切换秒开；TTL 远短于会话有效期，避免复用过期游标。
+    var pageCacheKey = "theater:page1:v1:" + key;
+    if (page === 1) {
+      var cachedPage = cacheGet(pageCacheKey);
+      if (cachedPage !== null) return cachedPage;
+    }
     var session = getSession(key, page);
     var cursor = await fillTheaterCursors(page, type, selected, session, key);
     if (!cursor) {
@@ -5239,13 +5261,15 @@ spider.accountParse = function (action, text) {
     session.order = Date.now();
     saveSession(key, session);
 
-    return {
+    var output = {
       items: items,
       hasMore: hasMore && page < 100,
       filters: page === 1 ? filters : [],
       nextOffset: hasMore ? nextOffset : null,
       sessionId: nextSession,
     };
+    if (page === 1) cacheSet(pageCacheKey, output, 45 * 1000);
+    return output;
   }
 
   async function theaterFilters(type) {
