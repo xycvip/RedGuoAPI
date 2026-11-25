@@ -8,6 +8,7 @@ on:
       - "script/main.js"
       - ".github/scripts/build_dist.py"
       - ".github/workflows/publish-script.yml"
+      - "tests/validate_main_js.py"
   workflow_dispatch:
 
 permissions:
@@ -28,6 +29,17 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 QuickJS 检查器
+        run: python -m pip install --disable-pip-version-check quickjs==1.19.4
+
+      - name: QuickJS 编译与宿主接口契约检查
+        run: python tests/validate_main_js.py
 
       - name: 校验 Python
         run: python3 --version
