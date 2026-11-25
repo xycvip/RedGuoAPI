@@ -4907,6 +4907,44 @@ spider.accountParse = function (action, text) {
     return typeof host !== "undefined" && host && typeof host.cacheGet === "function" ? host : null;
   }
 
+  // 剧院模块是独立闭包，不能直接调用 bridge 模块闭包内的 cacheGet/cacheSet。
+  // 宿主支持 KV 时跨 runtime 缓存；旧宿主或桌面探针不支持时安全退回本次 runtime 内存。
+  var memoryTheaterPages = {};
+
+  function theaterPageCacheGet(key) {
+    var hc = hostCache();
+    if (hc) {
+      try {
+        var raw = hc.cacheGet(key);
+        if (raw === null || raw === undefined || raw === "") return null;
+        return JSON.parse(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+    var entry = memoryTheaterPages[key];
+    if (!entry) return null;
+    if (entry.expire > 0 && entry.expire <= Date.now()) {
+      delete memoryTheaterPages[key];
+      return null;
+    }
+    return entry.value;
+  }
+
+  function theaterPageCacheSet(key, value, ttlMs) {
+    var hc = hostCache();
+    if (hc && typeof hc.cacheSet === "function") {
+      try {
+        hc.cacheSet(key, JSON.stringify(value), ttlMs || 0);
+        return;
+      } catch (_) { /* 持久化失败不影响剧院正常加载 */ }
+    }
+    memoryTheaterPages[key] = {
+      value: value,
+      expire: ttlMs ? Date.now() + ttlMs : 0
+    };
+  }
+
   function loadSessions() {
     var hc = hostCache();
     if (hc) {
@@ -5208,7 +5246,7 @@ spider.accountParse = function (action, text) {
     // 首屏短缓存用于分类来回切换秒开；TTL 远短于会话有效期，避免复用过期游标。
     var pageCacheKey = "theater:page1:v1:" + key;
     if (page === 1) {
-      var cachedPage = cacheGet(pageCacheKey);
+      var cachedPage = theaterPageCacheGet(pageCacheKey);
       if (cachedPage !== null) return cachedPage;
     }
     var session = getSession(key, page);
@@ -5268,7 +5306,7 @@ spider.accountParse = function (action, text) {
       nextOffset: hasMore ? nextOffset : null,
       sessionId: nextSession,
     };
-    if (page === 1) cacheSet(pageCacheKey, output, 45 * 1000);
+    if (page === 1) theaterPageCacheSet(pageCacheKey, output, 45 * 1000);
     return output;
   }
 
