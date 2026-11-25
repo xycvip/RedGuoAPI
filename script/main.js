@@ -962,7 +962,14 @@ async function detail(id) {
   let accessibleCount = 0;
 
   // 1. 优先调用官方 App API 获取权威分集数据与精准 vid
-  const appData = await fetchAppDetail(cleanId);
+  let appDetailError = null;
+  let appData = null;
+  try {
+    appData = await fetchAppDetail(cleanId);
+  } catch (error) {
+    // 官方 App 详情接口失败时仍允许继续走网页 SSR 兜底。
+    appDetailError = error;
+  }
   if (appData) {
     title = cleanText(appData.series_title || appData.series_name || appData.title);
     cover = cleanCoverUrl(appData.series_cover || appData.cover || "");
@@ -2578,22 +2585,78 @@ Public License instead of this License.  But first, please read
 
 (function () {
   const searches = new Map();
+  const SEARCH_STATE_TTL = 15 * 60 * 1000;
+  const SEARCH_CACHE_PREFIX = "search:page-state:v2:";
+
+  function searchStateKey(query) {
+    return SEARCH_CACHE_PREFIX + encodeURIComponent(query);
+  }
+
+  function restoreSearchState(query) {
+    const key = searchStateKey(query);
+    try {
+      if (typeof host !== "undefined" && host && typeof host.cacheGet === "function") {
+        const raw = host.cacheGet(key);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved && Array.isArray(saved.pages) && Array.isArray(saved.cursors)) {
+            return {
+              pages: new Map(saved.pages),
+              cursors: new Map(saved.cursors),
+              updated: Number(saved.updated) || Date.now(),
+              end: saved.end === null || saved.end === undefined ? null : Number(saved.end)
+            };
+          }
+        }
+      }
+    } catch (_) { /* 缓存损坏或宿主不可用时从第一页恢复 */ }
+    return searches.get(query) || null;
+  }
+
+  function persistSearchState(query, state) {
+    searches.set(query, state);
+    while (searches.size > 8) searches.delete(searches.keys().next().value);
+    try {
+      if (typeof host !== "undefined" && host && typeof host.cacheSet === "function") {
+        host.cacheSet(searchStateKey(query), JSON.stringify({
+          pages: Array.from(state.pages.entries()),
+          cursors: Array.from(state.cursors.entries()),
+          updated: state.updated,
+          end: state.end
+        }), SEARCH_STATE_TTL);
+      }
+    } catch (_) { /* 持久化失败不影响当前搜索结果 */ }
+  }
+
   spider.search = async function (word, quick, page) {
     const query = String(word || '').trim().slice(0, 100);
     const pg = Math.max(1, Number.parseInt(page, 10) || 1);
     if (!query) return { page: pg, pagecount: pg, limit: 10, total: 0, list: [] };
-    let state = searches.get(query);
-    if (pg === 1 || !state || Date.now() - state.updated > 15 * 60 * 1000) {
+    if (pg > 100) throw new Error("搜索页数过深，请重新搜索");
+    let state = pg === 1 ? null : restoreSearchState(query);
+    if (pg === 1 || !state || Date.now() - state.updated > SEARCH_STATE_TTL) {
       state = { pages: new Map(), cursors: new Map([[1, {}]]), updated: Date.now(), end: null };
-      searches.delete(query);
       searches.set(query, state);
-      while (searches.size > 8) searches.delete(searches.keys().next().value);
     }
     if (state.end !== null && pg > state.end) return { page: pg, pagecount: state.end, limit: 10, total: 0, list: [] };
     if (!state.cursors.has(pg) && !state.pages.has(pg)) {
-      if (pg !== 2) throw new Error('搜索游标已过期，请从第一页重新搜索');
+      // QuickJS 每次调用都会重建；状态缺失时从第一页重放，逐页恢复游标链。
       await spider.search(query, quick, 1);
       state = searches.get(query);
+      for (let rebuildPage = 2; rebuildPage < pg; rebuildPage++) {
+        if (state.end !== null && rebuildPage > state.end) break;
+        if (!state.pages.has(rebuildPage)) {
+          if (!state.cursors.has(rebuildPage)) throw new Error("搜索游标重建失败，请重新搜索");
+          await spider.search(query, quick, rebuildPage);
+          state = searches.get(query);
+        }
+      }
+      if (state.end !== null && pg > state.end) {
+        return { page: pg, pagecount: state.end, limit: 10, total: 0, list: [] };
+      }
+      if (!state.cursors.has(pg) && !state.pages.has(pg)) {
+        throw new Error("搜索游标重建失败，请重新搜索");
+      }
     }
     if (!state.pages.has(pg)) {
       if (!state.cursors.has(pg)) return { page: pg, pagecount: pg, limit: 10, total: 0, list: [] };
@@ -2606,6 +2669,7 @@ Public License instead of this License.  But first, please read
       if (!result.hasMore) state.end = pg;
     }
     state.updated = Date.now();
+    persistSearchState(query, state);
     return state.pages.get(pg);
   };
 })();
@@ -2982,6 +3046,51 @@ spider.danmaku = function (id, startMs, durationMs) {
 (function () {
   const states = new Map();
   const details = new Map();
+  const FEED_STATE_TTL = 2 * 60 * 60 * 1000;
+  const FEED_CACHE_PREFIX = "feed:page-state:v2:";
+
+  function feedStateKey(scope) {
+    return FEED_CACHE_PREFIX + encodeURIComponent(scope);
+  }
+
+  function restoreFeedState(scope) {
+    try {
+      if (typeof host !== "undefined" && host && typeof host.cacheGet === "function") {
+        const raw = host.cacheGet(feedStateKey(scope));
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved && Array.isArray(saved.pages) && Array.isArray(saved.seen)) {
+            return {
+              pages: new Map(saved.pages),
+              seen: new Set(saved.seen),
+              updated: Number(saved.updated) || Date.now(),
+              cursor: saved.cursor || null,
+              cellId: saved.cellId || "",
+              sessionId: saved.sessionId || ""
+            };
+          }
+        }
+      }
+    } catch (_) { /* 缓存损坏时从第一页恢复 */ }
+    return states.get(scope) || null;
+  }
+
+  function persistFeedState(scope, state) {
+    states.set(scope, state);
+    while (states.size > 16) states.delete(states.keys().next().value);
+    try {
+      if (typeof host !== "undefined" && host && typeof host.cacheSet === "function") {
+        host.cacheSet(feedStateKey(scope), JSON.stringify({
+          pages: Array.from(state.pages.entries()),
+          seen: Array.from(state.seen),
+          updated: state.updated,
+          cursor: state.cursor,
+          cellId: state.cellId,
+          sessionId: state.sessionId
+        }), FEED_STATE_TTL);
+      }
+    } catch (_) { /* 持久化失败不影响当前 feed 请求 */ }
+  }
   globalThis.__hongguoFeedDetails = details;
   const text = value => value == null ? '' : String(value).trim();
   const number = value => Math.max(0, Number.parseInt(value, 10) || 0);
@@ -2999,21 +3108,28 @@ spider.danmaku = function (id, startMs, durationMs) {
     const page = Math.max(1, number(rawPage));
     const scope = text(rawScope).slice(0, 160);
     const initialOffset = Math.max(0, number((scope.match(/_(\d+)$/) || [])[1]));
-    let state = states.get(scope);
+    let state = page === 1 ? null : restoreFeedState(scope);
     if (page === 1) {
       state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
-      states.delete(scope);
       states.set(scope, state);
-      while (states.size > 16) states.delete(states.keys().next().value);
     }
     if (state && state.pages.has(page)) return state.pages.get(page);
-    if (!state || Date.now() - state.updated > 2 * 60 * 60 * 1000) {
+    if (!state || Date.now() - state.updated > FEED_STATE_TTL) {
       state = { pages: new Map(), seen: new Set(), updated: Date.now(), cursor: null };
-      states.delete(scope);
       states.set(scope, state);
-      while (states.size > 16) states.delete(states.keys().next().value);
+      // 状态丢失/过期时重拉第一页，恢复服务端分页会话。
+      if (page > 1) {
+        await spider.feed(1, scope);
+        state = states.get(scope);
+      }
     }
-    if (page > 1 && (!state.cursor || page !== state.pages.size + 1)) {
+    // 如果宿主直接请求跳页，按顺序重放中间页来建立正确 cursor。
+    while (page > 1 && state && state.pages.size < page - 1 && state.cursor) {
+      const nextPage = state.pages.size + 1;
+      await spider.feed(nextPage, scope);
+      state = states.get(scope);
+    }
+    if (page > 1 && (!state || !state.cursor || page !== state.pages.size + 1)) {
       return { page, pagecount: page, limit: 10, total: 0, list: [] };
     }
     const api = HongguoApp.fetchAppDiscoveryRaw;
@@ -3127,6 +3243,7 @@ spider.danmaku = function (id, startMs, durationMs) {
       change_type: 1, cell_id: cellId,
       offset, session_id: sessionId
     } : null;
+    persistFeedState(scope, state);
     return result;
   };
 })();
@@ -4896,12 +5013,11 @@ spider.accountParse = function (action, text) {
   }
 
   // ------------------------------------------------------------ 会话状态 ----
-  // 每个 key（类型 + 筛选条件）独立维护游标与已展示 ID。
-  // 宿主每次调用都会新建 QuickJS 实例，内存 Map 跨调用即丢失，所以会话必须落在
-  // host.cacheGet/cacheSet（由宿主 KV store 持久化，跨调用/进程有效）。
-  // Node 探针无 host 时退到内存 Map，仅用于本地验证。
-  var SESSION_CACHE_KEY = "theater:sessions:v1";
-  var SESSION_TTL_MS = 30 * 60 * 1000; // 30 分钟，与内容缓存同量级
+  // 每个「类型 + 筛选条件」使用独立 KV key，避免并发切换筛选时整体 JSON 读改写互相覆盖。
+  // QuickJS 每次调用都会重建，因此游标必须由宿主 KV 跨调用持久化。
+  var SESSION_CACHE_PREFIX = "theater:session:v2:";
+  var LEGACY_SESSION_CACHE_KEY = "theater:sessions:v1";
+  var SESSION_TTL_MS = 30 * 60 * 1000;
 
   function hostCache() {
     return typeof host !== "undefined" && host && typeof host.cacheGet === "function" ? host : null;
@@ -4945,36 +5061,45 @@ spider.accountParse = function (action, text) {
     };
   }
 
-  function loadSessions() {
+  var memorySessions = {};
+
+  function sessionCacheKey(key) {
+    return SESSION_CACHE_PREFIX + encodeURIComponent(key);
+  }
+
+  function loadSession(key) {
     var hc = hostCache();
     if (hc) {
-      var raw = hc.cacheGet(SESSION_CACHE_KEY);
-      if (raw) {
-        try {
-          var parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === "object") return parsed;
-        } catch (_) { /* 损坏则重建 */ }
-      }
+      try {
+        var raw = hc.cacheGet(sessionCacheKey(key));
+        if (raw) {
+          var saved = JSON.parse(raw);
+          if (saved && saved.cursors && typeof saved.cursors === "object") return saved;
+        }
+        // 兼容升级前的整体会话缓存，读取后迁移到独立 key。
+        var legacyRaw = hc.cacheGet(LEGACY_SESSION_CACHE_KEY);
+        if (legacyRaw) {
+          var legacy = JSON.parse(legacyRaw);
+          if (legacy && legacy[key] && legacy[key].cursors) {
+            var migrated = legacy[key];
+            if (typeof hc.cacheSet === "function") {
+              hc.cacheSet(sessionCacheKey(key), JSON.stringify(migrated), SESSION_TTL_MS);
+            }
+            return migrated;
+          }
+        }
+      } catch (_) { /* 损坏缓存时重建 */ }
     }
-    return memorySessions;
+    return memorySessions[key] || null;
   }
 
-  function saveSessions(map) {
-    memorySessions = map;
+  function saveSession(key, session) {
+    memorySessions[key] = session;
     var hc = hostCache();
     if (hc && typeof hc.cacheSet === "function") {
-      try { hc.cacheSet(SESSION_CACHE_KEY, JSON.stringify(map), SESSION_TTL_MS); } catch (_) { /* 忽略 */ }
+      try { hc.cacheSet(sessionCacheKey(key), JSON.stringify(session), SESSION_TTL_MS); } catch (_) { /* 不影响当前请求 */ }
     }
   }
-
-  /** 把单个会话写回缓存（读-改-写，避免 load 返回新对象导致改动丢失）。 */
-  function saveSession(key, session) {
-    var map = loadSessions();
-    map[key] = session;
-    saveSessions(map);
-  }
-
-  var memorySessions = {};
 
   function sessionKey(type, selected) {
     var sorted = Object.keys(selected || {}).sort().map(function (k) {
@@ -4997,29 +5122,16 @@ spider.accountParse = function (action, text) {
   }
 
   function getSession(key, page) {
-    var sessions = loadSessions();
     if (page === 1) {
-      var fresh = { filters: [], cursors: { 1: { offset: 0, sessionId: "" } }, shown: [], order: 0 };
-      fresh.order = Date.now();
-      sessions[key] = fresh;
-      // 淘汰最早的会话，最多保留 24 组（与原生一致）。
-      var keys = Object.keys(sessions);
-      while (keys.length > 24) {
-        var oldest = keys.reduce(function (a, b) {
-          return (sessions[a].order || 0) <= (sessions[b].order || 0) ? a : b;
-        });
-        delete sessions[oldest];
-        keys = Object.keys(sessions);
-      }
-      saveSessions(sessions);
+      var fresh = { filters: [], cursors: { 1: { offset: 0, sessionId: "" } }, shown: [], order: Date.now() };
+      saveSession(key, fresh);
       return fresh;
     }
-    var existing = sessions[key];
+    var existing = loadSession(key);
     if (existing && existing.cursors) return existing;
-    // 会话被缓存淘汰后不要直接报错：从第 1 页的初始游标重放，把游标链补回来。
+    // 会话被缓存淘汰后从第 1 页初始游标重放，恢复分页链。
     var rebuilt = { filters: [], cursors: { 1: { offset: 0, sessionId: "" } }, shown: [], order: Date.now() };
-    sessions[key] = rebuilt;
-    saveSessions(sessions);
+    saveSession(key, rebuilt);
     return rebuilt;
   }
 
@@ -5204,10 +5316,8 @@ spider.accountParse = function (action, text) {
 
   /** 强制重开一份剧院会话：旧游标链被服务端作废时，只能从第 1 页重新走。 */
   function resetTheaterSession(key) {
-    var sessions = loadSessions();
     var fresh = { filters: [], cursors: { 1: { offset: 0, sessionId: "" } }, shown: [], order: Date.now() };
-    sessions[key] = fresh;
-    saveSessions(sessions);
+    saveSession(key, fresh);
     return fresh;
   }
 
