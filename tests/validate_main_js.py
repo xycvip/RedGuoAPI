@@ -166,6 +166,27 @@ def test_feed_state_survives_runtime_restart(source: str) -> None:
     print("首页 feed 跨 Runtime 第 1～2 页游标恢复：通过")
 
 
+
+def test_detail_web_fallback_after_app_error(source: str) -> None:
+    ctx = make_context(source, {})
+    ctx.eval("""
+      host.fetch = function(spec) {
+        return {
+          status: 200,
+          headers: {"content-type": "text/html; charset=utf-8"},
+          body: '<html><script>var detail = {"vid_list":[123456789012345678]}</script></html>',
+          url: spec && spec.url || ""
+        };
+      };
+      HongguoApp.fetchAppDetailRaw = function() {
+        throw new Error("mock official App detail failure");
+      };
+    """)
+    result = run_async(ctx, "HongguoAPI.detail('123456789012345678')")
+    assert result.get("drama") and result["drama"]["title"].startswith("短剧")
+    assert result.get("chapters") and len(result["chapters"]) == 1
+    print("App 详情接口异常后网页兜底：通过")
+
 def main() -> None:
     if not SOURCE.is_file():
         raise SystemExit("找不到 script/main.js")
@@ -212,6 +233,7 @@ def main() -> None:
     print("App 宿主导出契约：通过")
     test_search_state_survives_runtime_restart(source)
     test_feed_state_survives_runtime_restart(source)
+    test_detail_web_fallback_after_app_error(source)
 
 
 if __name__ == "__main__":
