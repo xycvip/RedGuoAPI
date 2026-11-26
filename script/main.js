@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * This combined script is distributed under GPL-3.0-only.
+ * It includes an App SMS login adaptation from OOIUa/hongguo-android.
+ */
 /*!
  * HongGuoTV 热更新脚本 · 单文件构建
  * 构建时间：2026-11-26 18:00:00
@@ -1479,7 +1483,310 @@ function ln(model, videoId, downloadQuality) {
   if (!entries.length) throw new Error(downloadQuality === 'auto' ? '本集暂未提供兼容的 H.264/HEVC 片源' : '本集暂未提供满足下载清晰度的片源');
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
-var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
+var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}
+/* SPDX-License-Identifier: GPL-3.0-only
+ * App SMS login protocol adapted from OOIUa/hongguo-android
+ * app/src/main/java/com/hongguo/account/protocol/{PhoneLogin,Signer,VendorConstants}.kt
+ * Signer lineage: tsukiyo-zero/hongguoTV 34c793055fa897075d9061dc7d62ee84031ef855
+ * and drpys 22261adfa31435e3b3ef5a730b8a2a75bcaf1715.
+ * This block is a GPL-3.0-only adaptation; do not relicense it separately.
+ */
+const APP_PHONE_DEVICE_ID = "1905892595378490";
+const APP_PHONE_INSTALL_ID = "1905892595382586";
+const APP_PHONE_APP_UA = "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)";
+const APP_PHONE_VIDEO_UA = "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)";
+const APP_PHONE_DEVICE = {
+  ac:"wifi", channel:"update_64", aid:"8662", app_name:"novelread",
+  version_code:"73932", version_name:"7.3.9.32", device_platform:"android",
+  os:"android", ssmix:"a", device_type:"25053RT47C", device_brand:"Redmi",
+  language:"zh", os_api:"36", os_version:"16", manifest_version_code:"73932",
+  resolution:"1280*2772", dpi:"520", update_version_code:"73932",
+  host_abi:"arm64-v8a", dragon_device_type:"phone", pv_player:"73932",
+  compliance_status:"0", need_personal_recommend:"1", player_so_load:"1",
+  is_android_pad_screen:"0", device_id:APP_PHONE_DEVICE_ID, iid:APP_PHONE_INSTALL_ID
+};
+let appPhoneAttempt = {mobile:"",ticket:"",sent:false,nextSmsAt:0,cookies:{},submittedCodes:new Set()};
+const APP_PHONE_STATE_KEY="__app_phone_login_state_v1";
+const APP_PHONE_STATE_TTL=60*60*1000;
+function appPhoneSaveAttempt() {
+  try {
+    const bridge=globalThis.host;
+    if(!bridge||typeof bridge.cacheSet!=="function") return false;
+    const state={
+      mobile:String(appPhoneAttempt.mobile||""),
+      ticket:String(appPhoneAttempt.ticket||""),
+      sent:appPhoneAttempt.sent===true,
+      nextSmsAt:Number(appPhoneAttempt.nextSmsAt)||0,
+      cookies:appPhoneAttempt.cookies&&typeof appPhoneAttempt.cookies==="object"?appPhoneAttempt.cookies:{},
+      submittedCodes:Array.from(appPhoneAttempt.submittedCodes||[])
+    };
+    bridge.cacheSet(APP_PHONE_STATE_KEY,JSON.stringify(state),APP_PHONE_STATE_TTL);
+    return true;
+  } catch (_) { return false; }
+}
+function appPhoneRestoreAttempt() {
+  try {
+    const bridge=globalThis.host;
+    if(!bridge||typeof bridge.cacheGet!=="function") return;
+    const raw=bridge.cacheGet(APP_PHONE_STATE_KEY);
+    if(!raw) return;
+    const state=JSON.parse(String(raw));
+    if(!state||typeof state!=="object"||typeof state.mobile!=="string"||!/^\d{11}$/.test(state.mobile)||typeof state.ticket!=="string") return;
+    const cookies={};
+    if(state.cookies&&typeof state.cookies==="object") {
+      Object.keys(state.cookies).slice(0,32).forEach(key=>{
+        const value=String(state.cookies[key]||"");
+        if(/^[A-Za-z0-9_-]{1,80}$/.test(key)&&value.length<=4096&&value) cookies[key]=value;
+      });
+    }
+    const submitted=Array.isArray(state.submittedCodes)?state.submittedCodes.filter(code=>/^\d{4,8}$/.test(String(code))).slice(-10):[];
+    appPhoneAttempt={
+      mobile:state.mobile,
+      ticket:state.ticket.slice(0,4096),
+      sent:state.sent===true&&!!state.ticket,
+      nextSmsAt:Number.isFinite(Number(state.nextSmsAt))?Number(state.nextSmsAt):0,
+      cookies,
+      submittedCodes:new Set(submitted)
+    };
+  } catch (_) {}
+}
+function appPhoneClearAttempt() {
+  appPhoneAttempt={mobile:"",ticket:"",sent:false,nextSmsAt:0,cookies:{},submittedCodes:new Set()};
+  try {
+    const bridge=globalThis.host;
+    if(bridge&&typeof bridge.cacheSet==="function") bridge.cacheSet(APP_PHONE_STATE_KEY,null,0);
+  } catch (_) {}
+}
+function appPhoneDeviceProto(deviceId) {
+  return Oe([
+    [1,1,"sint"],[2,2,"sint"],[3,"8662"],[4,deviceId],
+    [5,"Ai6svO3PyrwDOUSmO6ZcResxu"],[6,"!noperm!"],
+    [7,-888888,"sint"],[8,-888888,"sint"],[9,3,"sint"],[10,-888888,"sint"],
+    [11,"!notset!"],[12,"Asia/Shanghai,8"],[13,"zh_CN"],[14,4,"sint"],
+    [16,255.24993896484375,"float"],[17,35.58599090576172,"float"],
+    [18,3.467449188232422,"float"],[19,3.467449188232422,"float"],
+    [20,255.1754913330078,"float"],[21,42.17544174194336,"float"],
+    [22,"16"],[23,41,"sint"],[24,36,"sint"],
+    [25,1728388016635,"sint"],[26,1728388016635,"sint"],
+    [27,1728388016635,"sint"],[28,1728388016637,"sint"],
+    [29,-1,"sint"],[30,"25053RT47C"],[31,"Redmi"],
+    [32,"25053RT47C"],[33,"25053RT47C"],[34,"Xiaomi"],
+    [35,"Redmi"],[36,"Redmi"],[38,31,"sint"]
+  ]);
+}
+function appPhoneMedusa(url, body, ts, device) {
+  const bodyMd5 = body ? K.createHash("md5").update(body).digest() : S.alloc(16);
+  const queryText = url.substring(url.indexOf("?") + 1);
+  const query = S.from(queryText);
+  const querySm3 = ht(query);
+  const queryBodyTs = ji(querySm3, bodyMd5, Z(ts), ts);
+  const nested = Oe([[1,111,"sint"],[2,10,"sint"],[3,694367,"sint"],[5,586952199,"sint"]]);
+  const messageRand = Math.floor(Math.random() * 4294967296);
+  const envLaunch = Math.floor(Math.random() * 21) + 100;
+  const envPid = Math.floor(Math.random() * 2000) + 10001;
+  const env = Oe([
+    [1,envLaunch,"sint"],[2,146331399,"sint"],[3,146331396,"sint"],
+    [5,7,"sint"],[6,"v04.06.04.03-bugfix"],[7,envPid,"sint"],
+    [12,appPhoneDeviceProto(device.device_id),"message"],
+    [13,Oe([[1,Math.floor(Date.now()/1000),"sint"],[2,-2,"sint"],[4,200,"sint"]]),"message"],
+    [14,device.version_name]
+  ]);
+  const queryHash = ht(S.concat([query,bodyMd5,S.from("none")]));
+  const message = Oe([
+    [1,S.from("f7e85ffad7d7dc3bd62ac87057cf6118","hex"),"bytes"],
+    [2,3,"sint"],[3,messageRand,"sint"],[4,"8662"],[5,device.device_id],
+    [6,"1588093228"],[7,device.version_name],[8,"v04.06.04-ml-android"],
+    [9,67503104,"sint"],[10,S.from("4001000000000000","hex"),"bytes"],
+    [12,ts,"sint"],[13,queryBodyTs,"bytes"],[14,querySm3.subarray(0,6),"bytes"],
+    [15,nested,"message"],[16,"AXYQOS6n2m60x1fVZHIrH3iol"],
+    [17,ts,"sint"],[19,queryHash,"bytes"],[20,"none"],[21,312,"sint"],
+    [23,env,"message"],
+    [24,'{"cmr":16777216,"cmr2":16777216,"un_h":1879194040,"vpn":0,"kd":0,"fkd":3672518972,"pd":-1872573247,"dyn":"","do":0,"tk":true}']
+  ]);
+  const random = Math.floor(Math.random() * 4294967296);
+  const signedKey = S.from("8ebdfa3806ecc5cee79423e6029ed82540bc2218bb7eaef71cb691f7aa8aa2f5","hex");
+  const keyParts = Zi(signedKey, random);
+  let transformed = Xi(message, keyParts[0]);
+  transformed = S.concat([S.from("4001000000000000","hex"),transformed]).reverse();
+  for (let i=0;i<transformed.length;i+=1) transformed[i] ^= keyParts[1][(~i)&3];
+  const check = ((querySm3[0]&63)<<14) | 0x18000001 | ((queryBodyTs[0]&63)<<8);
+  const packed = S.concat([S.from([0x35]),Z(Math.floor(Math.random()*4294967296)),Z(check),transformed,S.from([(random>>16)&255,(random>>24)&255])]);
+  const encrypted = new Tt(S.from("f1593376766ea98d34f31b057a9d5be4","hex"),ts)
+    .encrypt(packed,S.from("1fe109a4125283f418de9e051a969e12","hex"));
+  const version = S.from("03000000f7e85ffad7d7dc3bd62ac87057cf6118","hex");
+  const prefix = S.alloc(20);
+  for (let i=0;i<20;i+=4) prefix.writeUInt32LE((version.readUInt32LE(i)^ts)>>>0,i);
+  return S.concat([prefix,S.from([random&255,(random>>8)&255,0,1]),encrypted]).toString("base64");
+}
+function appPhoneEncode(value) {
+  return encodeURIComponent(String(value)).replace(/[!'()]/g, ch => '%' + ch.charCodeAt(0).toString(16).toUpperCase()).replace(/%7E/gi,'~');
+}
+function appPhoneEncodeMap(values) {
+  return Object.keys(values).map(k=>appPhoneEncode(k)+"="+appPhoneEncode(values[k])).join("&");
+}
+function appPhoneSign(path, values, body, device) {
+  const now = Date.now();
+  const ts = Math.floor(now/1000);
+  const base = "https://security.snssdk.com" + path;
+  let ticket = now, query = "";
+  for (let offset=0;offset<=127;offset+=1) {
+    ticket = now + offset;
+    query = appPhoneEncodeMap(Object.assign({},values,{ts:String(ts),_rticket:String(ticket)}));
+    if (to(base + "?" + query,body,ts) === 0) break;
+  }
+  if (to(base + "?" + query,body,ts) !== 0) throw new Error("无法生成 App 登录签名");
+  const url = base + "?" + query;
+  const random = Math.floor(Math.random()*65536);
+  const headers = {
+    "User-Agent":body ? APP_PHONE_VIDEO_UA : APP_PHONE_APP_UA,
+    "Accept":"application/json; charset=utf-8,application/x-protobuf",
+    "x-ss-req-ticket":String(ticket),
+    "x-tt-request-tag":"t=0;n=0",
+    "sdk-version":"2",
+    "passport-sdk-version":"50561",
+    "x-xs-from-web":"0",
+    "x-khronos":String(ts),
+    "x-ladon":S.from([(ts>>>24)&255,(ts>>>16)&255,(ts>>>8)&255,ts&255]).toString("base64"),
+    "x-argus":Z(ts).toString("base64"),
+    "x-gorgon":Wi(query,body,ts,random),
+    "x-helios":eo(ts),
+    "x-medusa":appPhoneMedusa(url,body,ts,device),
+    "x-tt-dt":""
+  };
+  if (body) {
+    headers["Content-Type"]="application/x-www-form-urlencoded";
+    headers["x-vc-bdturing-sdk-version"]="3.7.2.cn";
+    headers["x-ss-stub"]=K.createHash("md5").update(body).digest("hex").toUpperCase();
+  }
+  return {url,headers,body,ticket};
+}
+function appPhoneMask(number) {
+  const digits = String(number).replace(/\D/g,"");
+  return digits.length>=7 ? digits.slice(0,3)+"****"+digits.slice(-4) : "你的手机";
+}
+function appPhoneNormalize(raw) {
+  const value = String(raw||"").trim().replace(/[()\-]/g,"");
+  if (value.startsWith("+")) {
+    const match = value.match(/^\+(\d{1,4})\s+(.+)$/);
+    const number = match ? match[2].replace(/\s/g,"") : "";
+    if (!match || !/^\d{5,15}$/.test(number)) throw new Error("国际手机号请使用 +区号 手机号 格式");
+    return {country:match[1],number};
+  }
+  const number = value.replace(/\s/g,"");
+  if (!/^1[3-9][0-9]{9}$/.test(number)) throw new Error("请输入有效手机号");
+  return {country:"86",number};
+}
+function appPhoneCookieHeaders(response) {
+  let value = "";
+  const headers = response && response.headers;
+  if (headers && typeof headers.get === "function") value = headers.get("set-cookie") || "";
+  else if (headers) {
+    for (const key of Object.keys(headers)) if (key.toLowerCase()==="set-cookie") value=headers[key];
+  }
+  return String(value||"");
+}
+function appPhoneAbsorbCookies(raw) {
+  String(raw||"").split(/,(?=\s*[^;,=]+\s*=)/).forEach(part=>{
+    const pair=part.trim().split(";")[0], eq=pair.indexOf("=");
+    if(eq<=0)return;
+    const name=pair.slice(0,eq).trim(),value=pair.slice(eq+1).trim();
+    if(name&&value)appPhoneAttempt.cookies[name]=value;
+  });
+}
+function appPhoneCookieString() {
+  return Object.keys(appPhoneAttempt.cookies).map(k=>k+"="+appPhoneAttempt.cookies[k]).join("; ");
+}
+function appPhoneFailure(data) {
+  data=data||{};
+  const code=Number(data.error_code===undefined?-1:data.error_code);
+  const verification=Object.prototype.hasOwnProperty.call(data,"verify_center_decision_conf");
+  const captcha=!!data.captcha;
+  if(verification||captcha||code===1105) throw new Error("需要完成红果安全验证，本次登录未完成（错误码 "+code+"）");
+  const messages={1102:"验证码有误，请检查后重新输入",1202:"验证码有误，请检查后重新输入",1103:"验证码已失效，请重新获取",1104:"验证码已失效，请重新获取",1106:"请求过于频繁，请稍后再试",1107:"请求过于频繁，请稍后再试",1203:"错误次数过多或验证码已过期，请重新获取"};
+  throw new Error((messages[code]||"手机号登录失败，请稍后重试")+"（错误码 "+code+"）");
+}
+async function appPhoneRequest(path, params, form) {
+  const device=Object.assign({},APP_PHONE_DEVICE);
+  const passport=Object.assign({aid:"8662",app_name:"novelread",device_platform:"android"},params);
+  const queryDevice={};
+  Object.keys(device).forEach(k=>{if(k!=="device_id"&&k!=="iid")queryDevice[k]=device[k];});
+  const query=form ? queryDevice : Object.assign({},queryDevice,passport);
+  const body=form ? S.from(appPhoneEncodeMap(passport)) : null;
+  const signed=appPhoneSign(path,query,body,device);
+  const headers=Object.assign({},signed.headers);
+  const init={method:body?"POST":"GET",headers,redirect:"manual",timeoutMs:25000};
+  if(body) init.body=body.toString("utf8");
+  // Intentionally do not send Cookie: send_code cookies replayed into sms_login trigger provider error 2046.
+  const response=await fetch(signed.url,init);
+  appPhoneAbsorbCookies(appPhoneCookieHeaders(response));
+  appPhoneSaveAttempt();
+  const status=Number(response.status||0);
+  if(status<200||status>=300) throw new Error("App 登录请求失败（HTTP "+status+"）");
+  const raw=await response.text();
+  let reply;
+  try { reply=JSON.parse(raw); } catch (_) { throw new Error("App 登录接口返回了无效响应"); }
+  return reply;
+}
+async function appPhoneLoginCall(action,payload) {
+  appPhoneRestoreAttempt();
+  payload=payload||{};
+  const now=Date.now();
+  if(action==="phoneCode") {
+    if(now<appPhoneAttempt.nextSmsAt) throw new Error("请等待短信冷却后再试");
+    const parsed=appPhoneNormalize(payload.number);
+    appPhoneAttempt={mobile:parsed.number,ticket:"",sent:false,nextSmsAt:appPhoneAttempt.nextSmsAt,cookies:{},submittedCodes:new Set()};
+    const reply=await appPhoneRequest("/passport/mobile/send_code/v1/",{mobile:parsed.number,type:"24"},false);
+    const data=reply&&reply.data||{};
+    if(Object.prototype.hasOwnProperty.call(data,"verify_center_decision_conf")||reply.message!=="success") appPhoneFailure(data);
+    const ticket=String(data.mobile_ticket||"");
+    if(!ticket) throw new Error("红果未返回短信登录凭证，请稍后重试");
+    const rawRetry=data.retry_time===undefined?60:Number(data.retry_time);
+    const retry=Math.max(1,Math.min(3600,Number.isFinite(rawRetry)?rawRetry:60));
+    appPhoneAttempt.ticket=ticket;
+    appPhoneAttempt.sent=true;
+    appPhoneAttempt.nextSmsAt=Date.now()+retry*1000;
+    appPhoneSaveAttempt();
+    return {mobile:appPhoneMask(parsed.number),retryAfter:retry};
+  }
+  if(action!=="phoneSms") throw new Error("不支持的 App 登录操作");
+  if(!appPhoneAttempt.sent) throw new Error("请先重新获取验证码");
+  const code=String(payload.code||"");
+  if(!/^[0-9]{4,8}$/.test(code)) throw new Error("请输入 4—8 位验证码");
+  if(appPhoneAttempt.submittedCodes.has(code)) throw new Error("这个验证码已提交过，请输入新的验证码");
+  appPhoneAttempt.submittedCodes.add(code);
+  appPhoneAttempt.sent=false;
+  appPhoneSaveAttempt();
+  const attempts=[
+    ["/passport/mobile/sms_login/",true],
+    ["/passport/mobile/sms_login_only/",true],
+    ["/passport/mobile/sms_login_continue/",true],
+    ["/passport/mobile/validate_code/v1/",false],
+    ["/passport/mobile/validate_code/v1/",true]
+  ];
+  let sawExpired=false;
+  for(const [path,form] of attempts) {
+    const params={mobile:appPhoneAttempt.mobile,code,type:"24",mobile_ticket:appPhoneAttempt.ticket};
+    const reply=await appPhoneRequest(path,params,form);
+    if(appPhoneAttempt.cookies.sessionid||appPhoneAttempt.cookies.sessionid_ss) {
+      const cookie=appPhoneCookieString();
+      appPhoneClearAttempt();
+      return {_cookies:cookie};
+    }
+    const data=reply&&reply.data;
+    if(!data) continue;
+    if(data.mobile_ticket) appPhoneAttempt.ticket=String(data.mobile_ticket);
+    appPhoneSaveAttempt();
+    const errorCode=Number(data.error_code||0);
+    if(errorCode===0) continue;
+    if(errorCode===1) {sawExpired=true;continue;}
+    if(errorCode===1102||errorCode===1202) appPhoneAttempt.sent=true;
+    appPhoneSaveAttempt();
+    appPhoneFailure(data);
+  }
+  throw new Error(sawExpired?"登录会话已失效，请重新获取验证码":"登录没有成功，平台没有下发登录态");
+}
+
+mn.exports={appPhoneLoginCall:appPhoneLoginCall,resetAppPhoneLogin:function(){appPhoneClearAttempt();},buildAccountRequest:async function(action="profile",payload={}) {
   const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
@@ -4480,6 +4787,8 @@ spider.accountParse = function (action, text) {
     feed: feed,
     account: account,
     accountParse: accountParse,
+    appPhoneLoginCall: function(action, payload) { return HongguoApp.appPhoneLoginCall(action, payload || {}); },
+    resetAppPhoneLogin: function() { return HongguoApp.resetAppPhoneLogin(); },
     setAccountActive: setAccountActive,
 
     // 诊断用
@@ -5653,3 +5962,23 @@ spider.accountParse = function (action, text) {
     module.exports = ACCOUNT;
   }
 })(typeof globalThis !== "undefined" ? globalThis : this);
+
+/* App SMS actions use a separate, cookie-isolated passport session. */
+(function(g){
+  "use strict";
+  const api=g.HongguoAPI;
+  if(!api||typeof api.appPhoneLoginCall!=="function"||typeof api.accountCall!=="function")return;
+  const originalCall=api.accountCall;
+  api.accountCall=async function(action,payload,options){
+    if(action==="phoneCode"||action==="phoneSms") return api.appPhoneLoginCall(action,payload||{});
+    return originalCall.call(this,action,payload,options);
+  };
+  if(typeof api.resetAccount==="function"){
+    const originalReset=api.resetAccount;
+    api.resetAccount=function(){
+      try{if(typeof api.resetAppPhoneLogin==="function")api.resetAppPhoneLogin();}catch(_){}
+      return originalReset.apply(this,arguments);
+    };
+  }
+})(typeof globalThis!=="undefined"?globalThis:this);
+
