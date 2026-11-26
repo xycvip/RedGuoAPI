@@ -1531,7 +1531,7 @@ function appPhoneRestoreAttempt() {
     const raw=bridge.cacheGet(APP_PHONE_STATE_KEY);
     if(!raw) return;
     const state=JSON.parse(String(raw));
-    if(!state||typeof state!=="object"||typeof state.mobile!=="string"||!/^\\d{11}$/.test(state.mobile)||typeof state.ticket!=="string") return;
+    if(!state||typeof state!=="object"||typeof state.mobile!=="string"||!/^\d{11}$/.test(state.mobile)||typeof state.ticket!=="string") return;
     const cookies={};
     if(state.cookies&&typeof state.cookies==="object") {
       Object.keys(state.cookies).slice(0,32).forEach(key=>{
@@ -1539,7 +1539,7 @@ function appPhoneRestoreAttempt() {
         if(/^[A-Za-z0-9_-]{1,80}$/.test(key)&&value.length<=4096&&value) cookies[key]=value;
       });
     }
-    const submitted=Array.isArray(state.submittedCodes)?state.submittedCodes.filter(code=>/^\\d{4,8}$/.test(String(code))).slice(-10):[];
+    const submitted=Array.isArray(state.submittedCodes)?state.submittedCodes.filter(code=>/^\d{4,8}$/.test(String(code))).slice(-10):[];
     appPhoneAttempt={
       mobile:state.mobile,
       ticket:state.ticket.slice(0,4096),
