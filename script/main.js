@@ -1576,14 +1576,15 @@ function appPhoneEncodeMap(values) {
 function appPhoneSign(path, values, body, device) {
   const now = Date.now();
   const ts = Math.floor(now/1000);
+  const base = "https://security.snssdk.com" + path;
   let ticket = now, query = "";
   for (let offset=0;offset<=127;offset+=1) {
     ticket = now + offset;
     query = appPhoneEncodeMap(Object.assign({},values,{ts:String(ts),_rticket:String(ticket)}));
-    if (to(query,body,ts) === 0) break;
+    if (to(base + "?" + query,body,ts) === 0) break;
   }
-  if (to(query,body,ts) !== 0) throw new Error("无法生成 App 登录签名");
-  const url = "https://security.snssdk.com" + path + "?" + query;
+  if (to(base + "?" + query,body,ts) !== 0) throw new Error("无法生成 App 登录签名");
+  const url = base + "?" + query;
   const random = Math.floor(Math.random()*65536);
   const headers = {
     "User-Agent":body ? APP_PHONE_VIDEO_UA : APP_PHONE_APP_UA,
