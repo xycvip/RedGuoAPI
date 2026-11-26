@@ -4724,8 +4724,8 @@ spider.accountParse = function (action, text) {
     feed: feed,
     account: account,
     accountParse: accountParse,
-    appPhoneLoginCall: function(action, payload) { return spider.appPhoneLoginCall(action, payload || {}); },
-    resetAppPhoneLogin: function() { return spider.resetAppPhoneLogin(); },
+    appPhoneLoginCall: function(action, payload) { return HongguoApp.appPhoneLoginCall(action, payload || {}); },
+    resetAppPhoneLogin: function() { return HongguoApp.resetAppPhoneLogin(); },
     setAccountActive: setAccountActive,
 
     // 诊断用
