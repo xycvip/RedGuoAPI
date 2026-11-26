@@ -1616,9 +1616,10 @@ function appPhoneMask(number) {
 function appPhoneNormalize(raw) {
   const value = String(raw||"").trim().replace(/[()\-]/g,"");
   if (value.startsWith("+")) {
-    const match = value.match(/^\+(\d{1,4})\s+(\d{5,15})$/);
-    if (!match) throw new Error("国际手机号请使用 +区号 手机号 格式");
-    return {country:match[1],number:match[2]};
+    const match = value.match(/^\+(\d{1,4})\s+(.+)$/);
+    const number = match ? match[2].replace(/\s/g,"") : "";
+    if (!match || !/^\d{5,15}$/.test(number)) throw new Error("国际手机号请使用 +区号 手机号 格式");
+    return {country:match[1],number};
   }
   const number = value.replace(/\s/g,"");
   if (!/^1[3-9][0-9]{9}$/.test(number)) throw new Error("请输入有效手机号");
