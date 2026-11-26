@@ -1506,6 +1506,57 @@ const APP_PHONE_DEVICE = {
   is_android_pad_screen:"0", device_id:APP_PHONE_DEVICE_ID, iid:APP_PHONE_INSTALL_ID
 };
 let appPhoneAttempt = {mobile:"",ticket:"",sent:false,nextSmsAt:0,cookies:{},submittedCodes:new Set()};
+const APP_PHONE_STATE_KEY="__app_phone_login_state_v1";
+const APP_PHONE_STATE_TTL=60*60*1000;
+function appPhoneSaveAttempt() {
+  try {
+    const bridge=globalThis.host;
+    if(!bridge||typeof bridge.cacheSet!=="function") return false;
+    const state={
+      mobile:String(appPhoneAttempt.mobile||""),
+      ticket:String(appPhoneAttempt.ticket||""),
+      sent:appPhoneAttempt.sent===true,
+      nextSmsAt:Number(appPhoneAttempt.nextSmsAt)||0,
+      cookies:appPhoneAttempt.cookies&&typeof appPhoneAttempt.cookies==="object"?appPhoneAttempt.cookies:{},
+      submittedCodes:Array.from(appPhoneAttempt.submittedCodes||[])
+    };
+    bridge.cacheSet(APP_PHONE_STATE_KEY,JSON.stringify(state),APP_PHONE_STATE_TTL);
+    return true;
+  } catch (_) { return false; }
+}
+function appPhoneRestoreAttempt() {
+  try {
+    const bridge=globalThis.host;
+    if(!bridge||typeof bridge.cacheGet!=="function") return;
+    const raw=bridge.cacheGet(APP_PHONE_STATE_KEY);
+    if(!raw) return;
+    const state=JSON.parse(String(raw));
+    if(!state||typeof state!=="object"||typeof state.mobile!=="string"||!/^\\d{11}$/.test(state.mobile)||typeof state.ticket!=="string") return;
+    const cookies={};
+    if(state.cookies&&typeof state.cookies==="object") {
+      Object.keys(state.cookies).slice(0,32).forEach(key=>{
+        const value=String(state.cookies[key]||"");
+        if(/^[A-Za-z0-9_-]{1,80}$/.test(key)&&value.length<=4096&&value) cookies[key]=value;
+      });
+    }
+    const submitted=Array.isArray(state.submittedCodes)?state.submittedCodes.filter(code=>/^\\d{4,8}$/.test(String(code))).slice(-10):[];
+    appPhoneAttempt={
+      mobile:state.mobile,
+      ticket:state.ticket.slice(0,4096),
+      sent:state.sent===true&&!!state.ticket,
+      nextSmsAt:Number.isFinite(Number(state.nextSmsAt))?Number(state.nextSmsAt):0,
+      cookies,
+      submittedCodes:new Set(submitted)
+    };
+  } catch (_) {}
+}
+function appPhoneClearAttempt() {
+  appPhoneAttempt={mobile:"",ticket:"",sent:false,nextSmsAt:0,cookies:{},submittedCodes:new Set()};
+  try {
+    const bridge=globalThis.host;
+    if(bridge&&typeof bridge.cacheSet==="function") bridge.cacheSet(APP_PHONE_STATE_KEY,null,0);
+  } catch (_) {}
+}
 function appPhoneDeviceProto(deviceId) {
   return Oe([
     [1,1,"sint"],[2,2,"sint"],[3,"8662"],[4,deviceId],
@@ -1668,6 +1719,7 @@ async function appPhoneRequest(path, params, form) {
   // Intentionally do not send Cookie: send_code cookies replayed into sms_login trigger provider error 2046.
   const response=await fetch(signed.url,init);
   appPhoneAbsorbCookies(appPhoneCookieHeaders(response));
+  appPhoneSaveAttempt();
   const status=Number(response.status||0);
   if(status<200||status>=300) throw new Error("App 登录请求失败（HTTP "+status+"）");
   const raw=await response.text();
@@ -1676,6 +1728,7 @@ async function appPhoneRequest(path, params, form) {
   return reply;
 }
 async function appPhoneLoginCall(action,payload) {
+  appPhoneRestoreAttempt();
   payload=payload||{};
   const now=Date.now();
   if(action==="phoneCode") {
@@ -1692,6 +1745,7 @@ async function appPhoneLoginCall(action,payload) {
     appPhoneAttempt.ticket=ticket;
     appPhoneAttempt.sent=true;
     appPhoneAttempt.nextSmsAt=Date.now()+retry*1000;
+    appPhoneSaveAttempt();
     return {mobile:appPhoneMask(parsed.number),retryAfter:retry};
   }
   if(action!=="phoneSms") throw new Error("不支持的 App 登录操作");
@@ -1701,6 +1755,7 @@ async function appPhoneLoginCall(action,payload) {
   if(appPhoneAttempt.submittedCodes.has(code)) throw new Error("这个验证码已提交过，请输入新的验证码");
   appPhoneAttempt.submittedCodes.add(code);
   appPhoneAttempt.sent=false;
+  appPhoneSaveAttempt();
   const attempts=[
     ["/passport/mobile/sms_login/",true],
     ["/passport/mobile/sms_login_only/",true],
@@ -1713,21 +1768,25 @@ async function appPhoneLoginCall(action,payload) {
     const params={mobile:appPhoneAttempt.mobile,code,type:"24",mobile_ticket:appPhoneAttempt.ticket};
     const reply=await appPhoneRequest(path,params,form);
     if(appPhoneAttempt.cookies.sessionid||appPhoneAttempt.cookies.sessionid_ss) {
-      return {_cookies:appPhoneCookieString()};
+      const cookie=appPhoneCookieString();
+      appPhoneClearAttempt();
+      return {_cookies:cookie};
     }
     const data=reply&&reply.data;
     if(!data) continue;
     if(data.mobile_ticket) appPhoneAttempt.ticket=String(data.mobile_ticket);
+    appPhoneSaveAttempt();
     const errorCode=Number(data.error_code||0);
     if(errorCode===0) continue;
     if(errorCode===1) {sawExpired=true;continue;}
     if(errorCode===1102||errorCode===1202) appPhoneAttempt.sent=true;
+    appPhoneSaveAttempt();
     appPhoneFailure(data);
   }
   throw new Error(sawExpired?"登录会话已失效，请重新获取验证码":"登录没有成功，平台没有下发登录态");
 }
 
-mn.exports={appPhoneLoginCall:appPhoneLoginCall,resetAppPhoneLogin:function(){appPhoneAttempt={mobile:"",ticket:"",sent:false,nextSmsAt:0,cookies:{},submittedCodes:new Set()};},buildAccountRequest:async function(action="profile",payload={}) {
+mn.exports={appPhoneLoginCall:appPhoneLoginCall,resetAppPhoneLogin:function(){appPhoneClearAttempt();},buildAccountRequest:async function(action="profile",payload={}) {
   const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
