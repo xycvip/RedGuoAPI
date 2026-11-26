@@ -1568,7 +1568,7 @@ function appPhoneMedusa(url, body, ts, device) {
   return S.concat([prefix,S.from([random&255,(random>>8)&255,0,1]),encrypted]).toString("base64");
 }
 function appPhoneEncode(value) {
-  return encodeURIComponent(String(value)).replace(/%7E/gi,"~");
+  return encodeURIComponent(String(value)).replace(/[!'()]/g, ch => '%' + ch.charCodeAt(0).toString(16).toUpperCase()).replace(/%7E/gi,'~');
 }
 function appPhoneEncodeMap(values) {
   return Object.keys(values).map(k=>appPhoneEncode(k)+"="+appPhoneEncode(values[k])).join("&");
