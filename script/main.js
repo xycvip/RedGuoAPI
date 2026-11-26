@@ -1718,6 +1718,7 @@ async function appPhoneLoginCall(action,payload) {
     const errorCode=Number(data.error_code||0);
     if(errorCode===0) continue;
     if(errorCode===1) {sawExpired=true;continue;}
+    if(errorCode===1102||errorCode===1202) appPhoneAttempt.sent=true;
     appPhoneFailure(data);
   }
   throw new Error(sawExpired?"登录会话已失效，请重新获取验证码":"登录没有成功，平台没有下发登录态");
