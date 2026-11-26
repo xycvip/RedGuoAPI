@@ -1687,7 +1687,8 @@ async function appPhoneLoginCall(action,payload) {
     if(Object.prototype.hasOwnProperty.call(data,"verify_center_decision_conf")||reply.message!=="success") appPhoneFailure(data);
     const ticket=String(data.mobile_ticket||"");
     if(!ticket) throw new Error("红果未返回短信登录凭证，请稍后重试");
-    const retry=Math.max(1,Math.min(3600,Number(data.retry_time)||60));
+    const rawRetry=data.retry_time===undefined?60:Number(data.retry_time);
+    const retry=Math.max(1,Math.min(3600,Number.isFinite(rawRetry)?rawRetry:60));
     appPhoneAttempt.ticket=ticket;
     appPhoneAttempt.sent=true;
     appPhoneAttempt.nextSmsAt=Date.now()+retry*1000;
