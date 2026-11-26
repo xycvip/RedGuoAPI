@@ -1,6 +1,6 @@
 /*!
  * HongGuoTV 热更新脚本 · 单文件构建
- * 构建时间：2026-11-24 03:38:11
+ * 构建时间：2026-11-26 18:00:00
  * 组成：bridge.js(11KB) + hongguo.js(431KB) + adapter.js(24KB) + actor-rank.js(17KB) + theater.js(15KB) + account.js(7KB)
  * 总计：507 KB（其中数据源 431 KB）
  * 签名档：V5 真签名（x-helios / x-medusa）
@@ -1126,7 +1126,16 @@ async function detail(id) {
         vod_remarks: remarks,
         vod_play_from: "官方直链",
         vod_play_url: epUrls.join("#"),
-        accessible_count: 0
+        accessible_count: 0,
+        celebrities: (appData && Array.isArray(appData.celebrities) ? appData.celebrities : []).map(function (c) {
+          return {
+            id: String(c.celebrity_id || ""),
+            name: String(c.nickname || "").trim(),
+            role: String(c.role_name || "").trim(),
+            avatar: cleanCoverUrl(String(c.avatar || "")),
+            intro: String(c.intro || "").trim()
+          };
+        }).filter(function (a) { return a.name !== ""; })
       }
     ]
   };
@@ -4088,7 +4097,7 @@ spider.accountParse = function (action, text) {
     if (chapters.length === 0) {
       throw failure("红果详情没有返回分集", "EMPTY_CHAPTERS");
     }
-    var entry = { drama: drama, chapters: chapters };
+    var entry = { drama: drama, chapters: chapters, actors: (vod && Array.isArray(vod.celebrities)) ? vod.celebrities : [] };
     cacheSet("detail:" + seriesId, entry, 5 * 60 * 1000);
     return entry;
   }
