@@ -1786,7 +1786,7 @@ async function appPhoneLoginCall(action,payload) {
   throw new Error(sawExpired?"登录会话已失效，请重新获取验证码":"登录没有成功，平台没有下发登录态");
 }
 
-var appPhoneModuleExports={appPhoneLoginCall:appPhoneLoginCall,resetAppPhoneLogin:function(){appPhoneClearAttempt();},buildAccountRequest:async function(action="profile",payload={}) {
+globalThis.__appPhoneModuleExports={appPhoneLoginCall:appPhoneLoginCall,resetAppPhoneLogin:function(){appPhoneClearAttempt();},buildAccountRequest:async function(action="profile",payload={}) {
   const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
@@ -3997,7 +3997,7 @@ spider.accountParse = function (action, text) {
   if (action === 'poll') return { status: String(data.status || ''), redirect: String(data.redirect_url || '') };
   return { valid: true };
 };
-Object.assign(HongguoApp,appPhoneModuleExports);
+Object.assign(HongguoApp,globalThis.__appPhoneModuleExports); delete globalThis.__appPhoneModuleExports;
 
 /* ===== API v1 适配层 : src/adapter.js ===== */
 /* ============================================================================
