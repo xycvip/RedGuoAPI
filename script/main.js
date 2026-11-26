@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * This combined script is distributed under GPL-3.0-only.
+ * It includes an App SMS login adaptation from OOIUa/hongguo-android.
+ */
 /*!
  * HongGuoTV 热更新脚本 · 单文件构建
  * 构建时间：2026-11-26 18:00:00
@@ -4720,6 +4724,8 @@ spider.accountParse = function (action, text) {
     feed: feed,
     account: account,
     accountParse: accountParse,
+    appPhoneLoginCall: function(action, payload) { return spider.appPhoneLoginCall(action, payload || {}); },
+    resetAppPhoneLogin: function() { return spider.resetAppPhoneLogin(); },
     setAccountActive: setAccountActive,
 
     // 诊断用
