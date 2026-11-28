@@ -5620,6 +5620,27 @@ var APP_SIGN_CONST = {"sbox_b64": "+n0Ia5xZs0sEXznQOEqRmQBnpiCf9U2Ccybu3xhmgzOAA
 // (Bytes.kt / AesV3.kt / Signer.kt / VendorConstants.kt)，仅 32 位 hash 分支。
 // 用 Int32 (`|0`) 模拟 Kotlin Int 溢出，用 BigInt 模拟 Long 运算。
 
+// ---------- Buffer 兼容垫片（QuickJS 无 Node Buffer；仅签名栈用到的 from(str, 'utf8')）----------
+var Buffer = (function () {
+  function utf8Bytes(str) {
+    var input = String(str == null ? "" : str);
+    var out = [];
+    for (var i = 0; i < input.length; i++) {
+      var c = input.charCodeAt(i);
+      if (c >= 0xd800 && c <= 0xdbff && i + 1 < input.length) {
+        var n = input.charCodeAt(i + 1);
+        if (n >= 0xdc00 && n <= 0xdfff) { c = 0x10000 + ((c - 0xd800) << 10) + (n - 0xdc00); i++; }
+      }
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    return Uint8Array.from(out);
+  }
+  return { from: function (value) { return utf8Bytes(value); } };
+})();
+
 // ---------- 字节工具（对应 Bytes.kt） ----------
 const u = b => b & 255;
 function hexBytes(s) { return Uint8Array.from(s.match(/../g).map(x => parseInt(x, 16))); }
