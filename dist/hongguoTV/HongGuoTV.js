@@ -3390,37 +3390,51 @@ spider.accountParse = function (action, text) {
   // 头像/昵称字段覆盖对齐官方 ProfileRules：头像 6 种 key + 支持 {url_list:[...]} 对象，
   // 昵称 4 种 key（含 screen_name）。脚本旧版只认 avatar_url/avatar，官方接口下发
   // avatar_large/avatar_thumb/screen_name 等字段时会取空 → 头像退回首字、昵称退回「红果用户」。
-  const pickAvatar = (...nodes) => {
+  // 严格对齐权威 App 的 ProfileRules（hongguo-android/.../ProfileRules.kt，与其 iOS 版同源）。
+  // 节点顺序固定为 data → data.user → data.user_info，不扫描 base_info/user_data/profile。
+  // 头像 6 key、支持 {url_list:[...]}，只接受合法 https（升级 http/协议相对、拒绝空白与控制字符、
+  // 拒绝 userinfo、长度上限 2048）；昵称 4 key，trim、非空、≤64 码点、无 ISO 控制字符。
+  const profileNodes = root => [root, root && root.user, root && root.user_info];
+  const safeImageUrl = raw => {
+    if (typeof raw !== 'string') return '';
+    const value = raw.trim();
+    if (!value || value.length > 2048 || /[\s\u0000-\u001f\u007f]/.test(value)) return '';
+    let url = value;
+    if (url.startsWith('//')) url = 'https:' + url;
+    else if (/^http:\/\//i.test(url)) url = 'https://' + url.slice(7);
+    if (!/^https:\/\//i.test(url)) return '';
+    const host = url.slice(8).split(/[/?#]/)[0];
+    if (!host || host.indexOf('@') >= 0) return '';
+    return url;
+  };
+  // 头像：对齐 ProfileRules.avatarUrl —— data → user → user_info 三层 × 6 key。
+  const pickAvatar = root => {
     const keys = ['avatar_url', 'avatar_large_url', 'avatar_large', 'avatar_medium', 'avatar_thumb', 'avatar'];
-    const tidy = raw => {
-      if (typeof raw !== 'string' || !raw.trim()) return '';
-      let url = raw.trim().replace(/^http:\/\//, 'https://');
-      if (url.startsWith('//')) url = 'https:' + url;
-      return /^https?:\/\//.test(url) ? url : '';
-    };
-    for (const node of nodes) {
+    for (const node of profileNodes(root)) {
       if (!node || typeof node !== 'object') continue;
       for (const key of keys) {
         const value = node[key];
-        const direct = tidy(value);
-        if (direct) return direct;
-        if (value && typeof value === 'object' && Array.isArray(value.url_list)) {
-          for (const item of value.url_list) {
-            const url = tidy(typeof item === 'string' ? item : item && item.url);
-            if (url) return url;
-          }
+        const candidates = typeof value === 'string' ? [value]
+          : (value && typeof value === 'object' && Array.isArray(value.url_list) ? value.url_list : []);
+        for (const c of candidates) {
+          const url = safeImageUrl(typeof c === 'string' ? c : c && c.url);
+          if (url) return url;
         }
       }
     }
     return '';
   };
-  const pickDisplayName = (...nodes) => {
+  // 昵称：对齐 ProfileRules.displayName —— 同样三层 × 4 key，含码点/控制字符校验。
+  const pickDisplayName = root => {
     const keys = ['screen_name', 'nickname', 'user_name', 'name'];
-    for (const node of nodes) {
+    for (const node of profileNodes(root)) {
       if (!node || typeof node !== 'object') continue;
       for (const key of keys) {
         const value = node[key];
-        if (typeof value === 'string' && value.trim()) return value.trim();
+        if (typeof value !== 'string') continue;
+        const name = value.trim();
+        if (!name || Array.from(name).length > 64 || /[\u0000-\u001f\u007f]/.test(name)) continue;
+        return name;
       }
     }
     return '';
@@ -3451,46 +3465,35 @@ spider.accountParse = function (action, text) {
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
     const rawUserId = String(user.user_id || (data && data.user_id) || '');
     const encodeUserId = rawUserId && !/^\d+$/.test(rawUserId) ? rawUserId : '';
-    // 昵称取值对齐官方 ProfileRules：遍历 data / user / user_info / base_info / user_data /
-    // profile 各层的 screen_name、nickname、user_name、name，取第一个「非默认」值。
-    // 服务端对未完善资料账号会下发「用户+账号ID」这类默认昵称（如「用户486284977552」），
-    // 它不是用户设置的昵称；若只取某个节点（如 user_info）的默认值，就会把其它节点上的
-    // 真实昵称埋没，表现为「登录瞬间显示缓存里的正确昵称，几秒后 profile 回来变错」。
-    // 跳过默认值继续找，真实昵称落在哪一层都能取到；全是默认值时才退回服务端默认值。
-    const nameNodes = [user, data && data.user, data && data.user_info, data && data.base_info, data && data.user_data, data && data.profile, data];
-    const nameKeys = ['screen_name', 'nickname', 'user_name', 'name'];
-    const nameCandidates = [];
-    for (let ni = 0; ni < nameNodes.length; ni++) {
-      const node = nameNodes[ni];
-      if (!node || typeof node !== 'object') continue;
-      for (let ki = 0; ki < nameKeys.length; ki++) {
-        const nv = node[nameKeys[ki]];
-        if (typeof nv === 'string' && nv.trim()) nameCandidates.push(nv.trim());
-      }
+    // 昵称/头像严格对齐权威 CloudAccount.profile + ProfileRules：
+    //   昵称 = data.user_name（仅顶层、trim、≤64码点、无控制字符），空白时返回空串交由宿主
+    //          用官网 webInfo 昵称兜底（权威语义：user_name 空白才回退 website.nickname）。
+    //   头像 = ProfileRules.avatarUrl(data)（data → user → user_info 三层 × 6 key）。
+    // 不做「跳过默认昵称」「扫描 base_info/user_data」——权威没有这套；服务端真实 user_name
+    // 即使形如「用户+数字」，那也是该账号在红果的真实昵称，应如实展示，不能自作主张替换。
+    const rawName = data && data.user_name;
+    let nickname = '';
+    if (typeof rawName === 'string') {
+      const trimmed = rawName.trim();
+      if (trimmed && Array.from(trimmed).length <= 64 && !/[\u0000-\u001f\u007f]/.test(trimmed)) nickname = trimmed;
     }
-    const isDefaultName = /^用户\s*\d{5,}$/;
-    let finalName = '';
-    for (let ci = 0; ci < nameCandidates.length; ci++) {
-      if (!isDefaultName.test(nameCandidates[ci])) { finalName = nameCandidates[ci]; break; }
-    }
-    if (!finalName) finalName = nameCandidates[0] || '';
-    const avatar = pickAvatar(user, data && data.user, data && data.user_info, data && data.base_info, data);
+    const avatar = pickAvatar(data);
     return {
       id,
       bizUserId: pickNumericId(user.biz_user_id, data && data.biz_user_id) || id,
       encodeUserId,
-      nickname: String(finalName || '红果用户').slice(0, 80),
+      nickname,
       avatar
     };
   }
   if (action === 'webInfo') {
     if (response.message !== 'success' || !data) throw new Error('官方登录请求失败');
-    const user = (data && (data.user_info || data.base_info || data.user_data || data.user)) || data || {};
-    const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
+    const id = String(data.user_id_str || data.user_id || data.biz_user_id || data.id || '');
+    // 官网资料昵称/头像：对齐 ProfileRules.displayName / avatarUrl —— data → user → user_info 三层。
     return {
       id: /^\d{1,30}$/.test(id) ? id : '',
-      nickname: String(user.name || user.user_name || user.screen_name || pickDisplayName(user, data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
-      avatar: pickAvatar(user, data && data.user, data && data.user_info, data),
+      nickname: pickDisplayName(data),
+      avatar: pickAvatar(data),
       valid: true
     };
   }
