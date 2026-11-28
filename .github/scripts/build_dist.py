@@ -3,14 +3,19 @@
 
 发布原则：
   * HongGuoTV.js 与源码逐字节一致，不拼接、不压缩、不格式化；
-  * 版本时间取源码最后一次提交时间（中国标准时间），不再要求手工改 JS 头部；
+  * 版本号完全由 CI 决定，与 JS 文件里写的任何版本文字无关：
+      - workflow_dispatch 手动填写 VERSION_INPUT 时以它为准（统一补 v 前缀）；
+      - 否则读取 dist/index.json 里上一版版本号并 +0.0.1；
+      - 没有历史版本时从 1.0.0 起步。
+  * 版本号日期段取本次构建时间（中国标准时间），不是提交时间，也不是 JS 头部时间；
   * 每次构建重新计算 SHA-256、文件长度，并校验产物与源码完全一致；
   * 临时文件原子替换，避免生成半截发布文件。
 """
 
 import hashlib
 import json
-import subprocess
+import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,26 +32,60 @@ MIN_BYTES = 200 * 1024
 MAX_BYTES = 2 * 1024 * 1024
 TIME_ZONE = ZoneInfo("Asia/Shanghai")
 
+# 初始版本号；无历史版本或历史版本无法解析时从这里起步。
+INITIAL_VERSION = (1, 0, 0)
+# 严格匹配新版语义版本：v1.0.0 / 1.0.0 / v1.0.0-20261128 / 1.0.0-20261128。
+# 旧格式（如 2026.11.26.2158）不匹配，会安全回退到 INITIAL_VERSION，
+# 不会被误读成 (2026,11,26) 再递增出 v2026.11.27 这种错误版本。
+SEMVER_RE = re.compile(r"^v?(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:-\d{8})?$")
+
 
 def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
     sys.exit(1)
 
 
-def source_commit_time() -> datetime:
-    """读取最近一次修改主脚本的提交时间；无 Git 元数据时安全回退到当前 UTC。"""
+def version_string(parts: tuple[int, int, int], built: datetime) -> str:
+    major, minor, patch = parts
+    return f"v{major}.{minor}.{patch}-{built.strftime('%Y%m%d')}"
+
+
+def previous_version() -> tuple[int, int, int] | None:
+    """从 dist/index.json 读取上一版语义版本。
+
+    CI 每次都从最新 main 检出，dist/index.json 里就是上一次发布写入的版本，
+    因此这里天然形成「上一版 +0.0.1」的递增链，不依赖 git tag 或 run number。
+    """
     try:
-        value = subprocess.check_output(
-            ["git", "log", "-1", "--format=%cI", "--", "script/main.js"],
-            cwd=REPO,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-        if value:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(TIME_ZONE)
-    except (OSError, subprocess.CalledProcessError, ValueError):
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        raw = manifest.get("script", {}).get("version", "")
+        match = SEMVER_RE.match(str(raw).strip())
+        if match:
+            return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except (OSError, ValueError, TypeError, AttributeError):
         pass
-    return datetime.now(timezone.utc).astimezone(TIME_ZONE)
+    return None
+
+
+def resolve_version(built: datetime) -> str:
+    """版本号来源优先级：CI 手动输入 > 上一版 +0.0.1 > 初始 1.0.0。"""
+    manual = os.environ.get("VERSION_INPUT", "").strip()
+    if manual:
+        match = SEMVER_RE.match(manual)
+        if not match:
+            fail(f"版本号格式非法：{manual}（应形如 2.0.0 或 v2.0.0）")
+        parts = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        print(f"version source: 手动输入 {manual}")
+        return version_string(parts, built)
+
+    prev = previous_version()
+    if prev is not None:
+        parts = (prev[0], prev[1], prev[2] + 1)
+        print(f"version source: 自动递增 {prev} -> {parts}")
+        return version_string(parts, built)
+
+    print(f"version source: 初始版本 {INITIAL_VERSION}")
+    return version_string(INITIAL_VERSION, built)
 
 
 def main() -> None:
@@ -66,8 +105,9 @@ def main() -> None:
     if b"module.exports" not in data[-8192:]:
         fail("脚本尾部缺少 module.exports，文件可能被截断")
 
-    built = source_commit_time()
-    version = built.strftime("%Y.%m.%d.%H%M")
+    # 版本号与日期全部来自本次构建；绝不读取 JS 文件里写的版本文字。
+    built = datetime.now(timezone.utc).astimezone(TIME_ZONE)
+    version = resolve_version(built)
     built_at = built.isoformat(timespec="minutes")
 
     digest = hashlib.sha256(data).hexdigest()

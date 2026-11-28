@@ -41,13 +41,27 @@ else
   SHA=$(shasum -a 256 "$SRC" | cut -d' ' -f1)
 fi
 
-# 从脚本头部「构建时间：2026-11-24 03:38:11」生成 2026.11.24.0338
-VER=$(head -c 4096 "$SRC" \
-  | sed -n 's/.*构建时间：\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\) \([0-9]\{2\}\):\([0-9]\{2\}\).*/\1.\2.\3.\4\5/p' \
-  | head -1)
-if [ -z "$VER" ]; then
-  VER="0.0.0.0000"
+# 版本号完全由发布流程决定，与 main.js 里写的任何版本文字无关。
+# 优先级：环境变量 VERSION_INPUT > dist/index.json 上一版 +0.0.1 > 初始 1.0.0；日期取本次构建时间。
+DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+BASE=""
+if [ -n "${VERSION_INPUT:-}" ]; then
+  BASE=$(printf '%s' "$VERSION_INPUT" | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' | head -1)
+  if [ -z "$BASE" ]; then
+    echo "版本号格式非法：$VERSION_INPUT（应形如 2.0.0 或 v2.0.0）"
+    exit 1
+  fi
+elif [ -f dist/index.json ]; then
+  PREV=$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[[:digit:]]{8})?".*/\1 \2 \3/p' dist/index.json | head -1)
+  if [ -n "$PREV" ]; then
+    read -r MA MI PA <<<"$PREV"
+    BASE="$MA.$MI.$((10#$PA + 1))"
+  fi
 fi
+if [ -z "$BASE" ]; then
+  BASE="1.0.0"
+fi
+VER="v${BASE}-${DATE}"
 
 mkdir -p dist/hongguoTV
 cp "$SRC" dist/hongguoTV/HongGuoTV.js.tmp
