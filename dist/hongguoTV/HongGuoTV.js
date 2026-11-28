@@ -1,6 +1,6 @@
 /*!
  * HongGuoTV 热更新脚本 · 单文件构建
- * 构建时间：2026-11-26 18:00:00
+ * 构建时间：2026-11-27 12:18:27
  * 组成：bridge.js(11KB) + hongguo.js(431KB) + adapter.js(24KB) + actor-rank.js(17KB) + theater.js(15KB) + account.js(7KB)
  * 总计：507 KB（其中数据源 431 KB）
  * 签名档：V5 真签名（x-helios / x-medusa）
@@ -1427,6 +1427,11 @@ async function oo(r, e = {}) {
   const reusable = cached && cached.expiresAt > Date.now() + 5000;
   const u = reusable ? cached.model : await requestAppVideoModel(r, device, n);
   let f = [], h;
+  // 内联档位若含 ByteVC2（本机无法解码），记录后强制走 fallback 取 codec_type=1 的 H.265 兼容档
+  const hasVc2 = Object.values(u?.video_list || {}).some(it => {
+    const meta = it?.video_meta || {};
+    return 'bytevc2' === String(it?.codec_type || meta.codec_type || '').toLowerCase();
+  });
   try {
     f = ln(u, r, t);
     if (f.length && !reusable) {
@@ -1440,12 +1445,16 @@ async function oo(r, e = {}) {
       }
     }
   } catch (error) { h = error; }
-  if (f.length && !e.includeFallback) return { ...f[0], variants: f };
+  if (f.length && !e.includeFallback && !hasVc2) return { ...f[0], variants: f };
   let d = ro(u.fallback_api);
-  if (d && (!f.length || e.includeFallback || !Object.keys(u.video_list || {}).length || u.dynamic_video)) {
+  if (d && (!f.length || e.includeFallback || hasVc2 || !Object.keys(u.video_list || {}).length || u.dynamic_video)) {
     d = lt(d, ["fqnovel.com", "snssdk.com"]);
-    d = d.replace(/([?&])force_fids=[^&]*(&?)/, (y, I, F) => F ? I : "");
-    d = /[?&]format_type=/.test(d) ? d.replace(/([?&]format_type=)[^&]*/, "$1mp4") : d + (d.includes("?") ? "&" : "?") + "format_type=mp4";
+    if (!hasVc2) {
+      d = d.replace(/([?&])force_fids=[^&]*(&?)/, (y, I, F) => F ? I : "");
+      d = /[?&]format_type=/.test(d) ? d.replace(/([?&]format_type=)[^&]*/, "$1mp4") : d + (d.includes("?") ? "&" : "?") + "format_type=mp4";
+    }
+    // 内联含 ByteVC2 时保留 force_fids、不加 format_type，仅换 codec_type=1 取 H.265 全档；
+    // 删 force_fids / 加 format_type 会让该请求返回 code=1 空结果。
     d = /[?&]codec_type=/.test(d) ? d.replace(/([?&]codec_type=)[^&]*/, "$11") : d + (d.includes("?") ? "&" : "?") + "codec_type=1";
     try {
       let y = await Pe(d, { headers: { "User-Agent": dt } }, n);
@@ -1480,11 +1489,11 @@ function ln(model, videoId, downloadQuality) {
   const r = model, e = videoId, t = downloadQuality, n = entries;
 let i,o=[],a=new Set;for(let c of n)try{let s=c.item.spade_a||c.item.encrypt_info?.spade_a,u=s?no(s):null;for(let f of[c.item.main_url,c.item.backup_url,c.item.backup_url_1,c.item.backup_url_2,c.item.backup_url_3,...Array.isArray(c.item.backup_url_list)?c.item.backup_url_list:[]])if(!(typeof f!="string"||!f))try{let h=r.key_seed?io(f,S.from(r.key_seed,"base64")):/^https:\/\//i.test(cn(f))?cn(f):S.from(f,"base64").toString("utf8"),d=lt(h,["qznovelvod.com","fqnovelvod.com","douyinvod.com"]),x=u?u.toString("hex"):null,y=`${d}:${x||""}`;if(a.has(y))continue;a.add(y),o.push({url:d,contentKey:x,codec:c.codec==="bytevc1"?"hevc":c.codec||"auto",source:"app",vid:e,expiresAt:appModelExpiry(r),userAgent:dt,referer:"https://novelquickapp.com/",mediaBytes:Math.max(0,Number(c.item.size||c.item.video_meta?.size||0)),quality:c.quality,width:c.width,height:c.height})}catch(h){i=h}}catch(s){i=s}if(o.length)return o;throw i?.code==="SECURITY_BLOCKED"?i:Object.assign(new Error("\u672C\u96C6\u7247\u6E90\u5730\u5740\u6216\u5BC6\u94A5\u65E0\u6CD5\u89E3\u6790"),{code:"INVALID_RESPONSE"})}
 var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code:"73932",update_version_code:"73932",pv_player:"73932"},Ae;function ao(){let r=K.randomBytes(16);r[6]=r[6]&15|64,r[8]=r[8]&63|128;let e=r.toString("hex");return[e.slice(0,8),e.slice(8,12),e.slice(12,16),e.slice(16,20),e.slice(20)].join("-")}async function Ot(r=1/0){if(globalThis.__hongguoCachedDevice&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.iid))&&/^\d{10,24}$/.test(fe(globalThis.__hongguoCachedDevice.device_id))){globalThis.__hongguoCachedDevice={...globalThis.__hongguoCachedDevice,...he,iid:fe(globalThis.__hongguoCachedDevice.iid),device_id:fe(globalThis.__hongguoCachedDevice.device_id),cdid:fe(globalThis.__hongguoCachedDevice.cdid)||ao()};return globalThis.__hongguoCachedDevice;}return Ae||(Ae=(async()=>{let e=ao(),t={aid:8662,app_name:"novelread",package:"com.phoenix.read",app_version:he.version_name,version_code:73932,update_version_code:73932,manifest_version_code:73932,sdk_version:"6.18.0",device_platform:"android",os:"Android",os_version:he.os_version,os_api:Number(he.os_api),device_model:he.device_type,device_brand:he.device_brand,device_manufacturer:"Xiaomi",density_dpi:Number(he.dpi),display_density:"mdpi",resolution:he.resolution.replace("*","x"),language:"zh",timezone:8,access:"wifi",channel:he.channel,cdid:e,openudid:K.randomBytes(8).toString("hex")},n=await Pe("https://log.snssdk.com/service/2/device_register/?aid=8662&app_name=novelread",{method:"POST",headers:{"Content-Type":"application/json; charset=utf-8","User-Agent":dt},data:JSON.stringify({magic_tag:"ss_app_log",header:t,_gen_time:Date.now()})},Math.min(Date.now()+12e3,r)),i=fe(n.install_id_str),o=fe(n.device_id_str);if(!/^\d{10,24}$/.test(i)||!/^\d{10,24}$/.test(o))throw Object.assign(new Error("\u65E0\u6CD5\u521D\u59CB\u5316\u5B98\u65B9\u4F1A\u8BDD"),{code:"GUEST_REGISTRATION_FAILED"});let dev={...he,iid:i,device_id:o,cdid:e};globalThis.__hongguoCachedDevice=dev;if(typeof __native_save_device==="function"){try{__native_save_device(JSON.stringify(dev));}catch(_){}}return dev;})().catch(e=>{throw Ae=null,e})),Ae}async function co(r,e={},t=!1){t&&!globalThis.__hongguoAccountActive&&(Ae=null,delete globalThis.__hongguoCachedDevice);let deadline=Math.min(Date.now()+12e3,e.deadline||1/0),n=await Ot(deadline),i={query:r,count:0,offset:e.offset||0,tab_type:e.fallbackToGeneral?11:29,tab_name:e.fallbackToGeneral?"":"feed",search_source:1,use_correct:!1,use_lynx:!1,user_is_login:globalThis.__hongguoAccountActive?1:0,bookshelf_search_plan:4,bookstore_tab:16,is_first_enter_search:!e.offset};e.passback&&(i.passback=e.passback),e.searchId&&(i.search_id=e.searchId);let o=Ht(null,"https://reading.snssdk.com/reading/bookapi/search/tab/v",i,n),a=await Pe(o.url,{headers:{...o.headers,lc:"101"}},deadline);if(Number(a.code)!==0||!Array.isArray(a.search_tabs))throw Object.assign(new Error("\u5B98\u65B9\u641C\u7D22\u672A\u8FD4\u56DE\u6709\u6548\u7ED3\u679C"),{code:"SEARCH_REJECTED",category:"business_reject"});return a}async function so({seriesId:r,videoId:e,startMs:t=0,durationMs:n,cursor:i=""}){if(!/^\d{10,30}$/.test(String(r))||!/^\d{10,30}$/.test(String(e)))throw new Error("\u5F39\u5E55\u5206\u96C6\u7F16\u53F7\u65E0\u6548");let o={comment_source:601,server_channel:1e3,group_id:String(e),group_type:30,comment_type:20,sort:1,business_param:{book_id:String(r),start_offset_time:t,playlet_item_duration:n},count:90,cursor:String(i),aid:8662,compliance_status:0},a=await Ot(),c=Ht(JSON.stringify(o),"https://reading.snssdk.com/novel/commentapi/comment/list/"+e+"/v1/",{},a);return Pe(c.url,{method:"POST",headers:{...c.headers,lc:"101"},data:c.body},Date.now()+5e3)}mn.exports={buildAccountRequest:async function(action="profile",payload={}) {
-  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/"};
+  const routes={profile:"/reading/user/info/v1/",favorites:"/reading/bookapi/bookshelf/video/list/v1/",history:"/reading/bookapi/read_progress/list/v1/",libraryDetails:"/reading/bookapi/multi-detail/v1/",libraryDetail:"/novel/player/video_detail/v1/",favoriteUpdate:"/reading/bookapi/bookshelf/video/update/v1/",progressGet:"/reading/bookapi/read_progress/get/v1/",progressUpdate:"/reading/bookapi/read_progress/upload/v1/",socialDetail:"/novel/player/video_detail/v1/",creatorList:"/reading/user/celebrity/list/v1/",likeUpdate:"/reading/ugc/action/set/v1/",creatorFollow:"/novel/commentapi/comment/do_action/v1/",followingCreators:"/novel/commentapi/relation/list/",creatorWorks:"/novel/commentapi/user/profile/",likedVideos:"/reading/ugc/action/mget/v",creatorProfile:"/reading/user/profile/get/v",commentList:"/novel/commentapi/comment/list/",commentReplyList:"/novel/commentapi/reply/list/",historyDelete:"/reading/bookapi/read_history/update/v",reservations:"/reading/user/subscribe/list/v1/",reserveUpdate:"/reading/bookapi/search/uncover_subscribe/v"};
   if(!Object.prototype.hasOwnProperty.call(routes,action))throw new Error("不支持的账号操作");
   const identity=value=>{const id=String(value||"");if(!/^[1-9]\d{0,29}$/.test(id))throw new Error("账号剧集编号无效");return id;};
   const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error("账号进度参数无效");return n;};
-  const params=action==="history"?{book_types:"2",limit:"50"}:{};
+  const params=action==="history"?{book_types:"2",limit:"50"}:action==="reservations"?{limit:"20",offset:String(integer(payload.offset===undefined?0:payload.offset)),subscribe_offset:String(integer(payload.offset===undefined?0:payload.offset)),tab_type:"13",subscribe_order_type:"0",swipe_type:"0",need_calendar_schema:"false",is_online:String(payload.online===true?"true":"false")}:{};
   let body=null;
   if(action==="libraryDetails") {
     const ids=String(payload.ids||"").split(",");
@@ -1504,6 +1513,22 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     const duration=integer(payload.durationMs),position=Math.min(integer(payload.positionMs),duration),episode=integer(payload.episode),count=integer(payload.episodes);
     if(!duration||!episode||count&&episode>count)throw new Error("账号进度参数无效");
     body={books:[{book_id:identity(payload.id),item_id:identity(payload.itemId),vid_index:episode,current_play_time:position,current_total_time:duration,episode_count:count,read_timestamp_ms:integer(payload.updatedAt),book_type:2,progress_rate:String(position/duration)}],write_mode:1};
+  }
+  if(action==="historyDelete") {
+    const bookId=identity(payload.id),videoId=identity(payload.itemId||payload.id);
+    const stamp=integer(payload.updatedAt||Date.now());
+    const row={book_id:Number(bookId),book_type:2,vid:Number(videoId),vid_index:0,
+      current_play_position:0,player_accumulate_total_time:0,read_timestamp_ms:stamp,update_timestamp_ms:stamp,
+      is_delete:true,use_soft_delete:true,is_interactive_game:false,is_listen_mode:false,user_digg:false,
+      meet_guide_comment_tag:false,user_playlet_comment_flag:false,
+      chapter_index:0,is_multi_season:false,season_index:0,digged_count:0,duration:0,episode_cnt:0,
+      origin_novel_book_id:0,recent_reads:0,retain_video_play_time:0,series_play_cnt:0,tone_id:0};
+    body={update_datas:[row]};
+  }
+  if(action==="reserveUpdate") {
+    if(!["1","2"].includes(String(payload.opType)))throw new Error("预约状态无效");
+    body={item_id:identity(payload.id),item_type:1,op_type:integer(payload.opType),
+      wish_list_all_del:0,shark_param:{enter_from:"BulletActivity",previous_page:"MainFragmentActivity",page_list:"MainFragmentActivity,BulletActivity"}};
   }
   if(action==="socialDetail"||action==="libraryDetail")body={series_id:identity(payload.id)};
   if(action==="creatorList")Object.assign(params,{series_id:identity(payload.id),list_type:3,count:50,offset:0});
@@ -2688,7 +2713,67 @@ spider.danmaku = function (id, startMs, durationMs) {
 };
 
 (function () {
-  const states = new Map();
+  // 榜单游标状态持久化：QuickJS 每次调用都是全新 runtime，内存 Map 活不过单次调用。
+  // 翻第 2 页时若读不到游标就会重放第 1 页（多 1~N 次网络往返），这是「榜单加载慢」的根因。
+  // 这里把整个 state 序列化到宿主 KV（跨 runtime 持久化），与剧院 session 方案一致；
+  // 旧宿主无 KV 时安全退回本次 runtime 内存。Map 需显式转成数组才能被 JSON 序列化。
+  const RANK_STATE_PREFIX = "ranking:state:v1:";
+  const RANK_STATE_TTL_MS = 2 * 60 * 60 * 1000;
+  const memoryStates = {};
+
+  function rankStateCache() {
+    return typeof host !== "undefined" && host && typeof host.cacheGet === "function" ? host : null;
+  }
+
+  function serializeRankState(state) {
+    if (!state) return null;
+    return {
+      pages: Array.from(state.pages.entries()),
+      cursors: Array.from(state.cursors.entries()),
+      updated: state.updated,
+      category: state.category,
+      isRanking: state.isRanking,
+      updatedText: state.updatedText
+    };
+  }
+
+  function deserializeRankState(raw) {
+    if (!raw || !Array.isArray(raw.pages) || !Array.isArray(raw.cursors)) return null;
+    return {
+      pages: new Map(raw.pages),
+      cursors: new Map(raw.cursors),
+      updated: raw.updated || 0,
+      category: raw.category,
+      isRanking: raw.isRanking,
+      updatedText: raw.updatedText || ''
+    };
+  }
+
+  function loadRankState(key) {
+    var hc = rankStateCache();
+    if (hc) {
+      try {
+        var raw = hc.cacheGet(RANK_STATE_PREFIX + encodeURIComponent(key));
+        if (raw) {
+          var state = deserializeRankState(JSON.parse(raw));
+          if (state && state.cursors.size) return state;
+        }
+      } catch (_) { /* 损坏缓存时重建 */ }
+    }
+    return memoryStates[key] || null;
+  }
+
+  function saveRankState(key, state) {
+    if (!state) return;
+    memoryStates[key] = state;
+    var hc = rankStateCache();
+    if (hc && typeof hc.cacheSet === "function") {
+      try {
+        hc.cacheSet(RANK_STATE_PREFIX + encodeURIComponent(key), JSON.stringify(serializeRankState(state)), RANK_STATE_TTL_MS);
+      } catch (_) { /* 持久化失败不影响本次加载 */ }
+    }
+  }
+
   const ttl = 2 * 60 * 60 * 1000;
   const api = HongguoApp.fetchAppDiscoveryRaw;
   const text = value => value == null ? '' : String(value).trim();
@@ -2818,29 +2903,26 @@ spider.danmaku = function (id, startMs, durationMs) {
 
   async function paged(key, rawPage, first) {
     const page = Math.max(1, number(rawPage));
-    let state = states.get(key);
+    let state = loadRankState(key);
     if (page === 1) {
       state = { pages: new Map(), cursors: new Map(), updated: Date.now() };
-      states.delete(key);
-      states.set(key, state);
-      while (states.size > 64) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
       state.isRanking = Boolean(initial.isRanking || key.startsWith('hongguo-app:'));
-      return await savePage(state, page, initial.cell, initial.data || {}, initial.params, initial.minimum);
+      const result = await savePage(state, page, initial.cell, initial.data || {}, initial.params, initial.minimum);
+      saveRankState(key, state);
+      return result;
     }
     if (state && state.pages.has(page)) return state.pages.get(page);
 
     // 游标自愈保护：当状态缺失、超时或缺失对应页码游标时，自动重新初始化并建立前序游标
     if (!state || Date.now() - state.updated > ttl || !state.cursors.has(page)) {
       state = { pages: new Map(), cursors: new Map(), updated: Date.now() };
-      states.delete(key);
-      states.set(key, state);
-      while (states.size > 64) states.delete(states.keys().next().value);
       const initial = await first();
       state.category = initial.category;
       state.isRanking = Boolean(initial.isRanking || key.startsWith('hongguo-app:'));
       const firstResult = await savePage(state, 1, initial.cell, initial.data || {}, initial.params, initial.minimum);
+      saveRankState(key, state);
       if (page === 1) return firstResult;
       // 重建状态时只补第 1 页游标的话，翻到第 3 页就拿不到 cursor，
       // 之前会静默返回空列表 + hasMore=false，现象就是「刷到一半刷不动」。
@@ -2852,6 +2934,7 @@ spider.danmaku = function (id, startMs, durationMs) {
         const res = await api('/reading/bookapi/bookmall/cell/change/v', { ...step, limit: 40, change_type: 1 });
         if (!res.data?.cell_view) throw failure('榜单游标重建失败，请重试', 'PAGE_REBUILD_FAILED');
         await savePage(state, p, res.data.cell_view, res.data || {}, step);
+        saveRankState(key, state);
       }
     }
 
@@ -2861,7 +2944,9 @@ spider.danmaku = function (id, startMs, durationMs) {
     }
 
     const response = await api('/reading/bookapi/bookmall/cell/change/v', { ...cursor, limit: 40, change_type: 1 });
-    return await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
+    const result = await savePage(state, page, response.data?.cell_view, response.data || {}, cursor);
+    saveRankState(key, state);
+    return result;
   }
 
   const legacyHome = spider.home;
@@ -3259,7 +3344,7 @@ spider.danmaku = function (id, startMs, durationMs) {
 
 spider.accountRequest = async function (action, payload) {
   payload = payload || {};
-  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
+  if (['profile', 'favorites', 'history', 'libraryDetails', 'libraryDetail', 'favoriteUpdate', 'progressGet', 'progressUpdate', 'socialDetail', 'creatorList', 'likeUpdate', 'creatorFollow', 'followingCreators', 'creatorWorks', 'likedVideos', 'creatorProfile', 'commentList', 'commentReplyList', 'historyDelete', 'reservations', 'reserveUpdate'].includes(action)) return HongguoApp.buildAccountRequest(action, payload);
   const paths = { qr: '/passport/web/get_qrcode/', poll: '/passport/web/check_qrconnect/', webInfo: '/passport/account/info/v2/', phoneCode: '/passport/web/send_code/', phoneSms: '/passport/web/sms_login_only/' };
   if (!Object.prototype.hasOwnProperty.call(paths, action)) throw new Error('不支持的账号操作');
   const params = { aid: '513755', passport_jssdk_version: '3.4.10', passport_jssdk_type: 'normal',
@@ -3504,20 +3589,56 @@ spider.accountParse = function (action, text) {
       return { id, episodes };
     }
     if (!data || typeof data !== 'object' || !['main_creator_user_list','hot_celebrity_user_list','celebrity_map_list'].some(key => key in data)) throw new Error('创作者列表格式已变化');
+    // 这里只取「主创作者」（发布方 / 制作方），也就是详情页作者信息要展示的人。
+    // hot_celebrity_user_list 是热门演职员（演员），不属于作者，绝不并入——
+    // 否则「作者信息」里会出现演员，与作者语义不符。
     const groups = Array.isArray(data.main_creator_user_list) ? data.main_creator_user_list : [];
-    const rows = [...groups.flatMap(group => Array.isArray(group && group.ugc_user_infos) ? group.ugc_user_infos : []), ...(Array.isArray(data.hot_celebrity_user_list) ? data.hot_celebrity_user_list : [])];
+    const rows = groups.flatMap(group => Array.isArray(group && group.ugc_user_infos) ? group.ugc_user_infos : []);
     const seen = new Set();
     return { creators: rows.flatMap(row => {
       if (!row || typeof row !== 'object') return [];
       const base = row.base_info || {}, relation = row.user_relation || {};
       const id = identity(row.user_id) || identity(base.user_id), name = String(base.user_name || '').trim();
-      const state = Number(relation.relation_type), relativeType = row.user_tag && row.user_tag.is_author === true ? 3 : 2;
+      const state = Number(relation.relation_type);
       if (!id || !name || seen.has(id)) return [];
       seen.add(id);
-      return [{ id, name: name.slice(0,80), relativeType,
+      // 主创作者列表里的人即发布方 / 制作方，统一记为作者本人（3）。
+      return [{ id, name: name.slice(0,80), relativeType: 3,
         following: [1,2,3,4].includes(state) ? state === 2 || state === 4 : null,
         canFollow: relation.can_follow === true && base.is_cancelled !== true }];
     }) };
+  }
+  // 云端预约片单：官方返回 data.subscribe_items，嵌套在 subscribe_data.video_detail 下。
+  // 只保留已预约条目，is_online 区分「已上线 / 未上线」两态，输出门面期望的 items 结构。
+  if (action === 'reservations') {
+    if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+    const asInt = value => Math.max(0, Math.floor(Number(value) || 0));
+    const digits = value => { const v = String(value || '').trim(); return /^\d{1,30}$/.test(v) ? v : ''; };
+    const pick = list => { for (const v of list) if (typeof v === 'string' && v.trim()) return v.trim(); return ''; };
+    const raw = data && Array.isArray(data.subscribe_items) ? data.subscribe_items : [];
+    const seen = new Set();
+    const items = [];
+    for (const row of raw) {
+      if (!row || typeof row !== 'object' || row.has_subscribed !== true) continue;
+      const online = row.is_online === true;
+      const sub = row.subscribe_data && typeof row.subscribe_data === 'object' ? row.subscribe_data : {};
+      const vd = sub.video_detail && typeof sub.video_detail === 'object' ? sub.video_detail : {};
+      const id = digits(sub.series_id || row.item_id || vd.series_id || vd.series_id_str);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      items.push({
+        id,
+        title: pick([vd.series_title, vd.series_name, sub.title, row.name]),
+        cover: cleanCoverUrl(pick([vd.series_cover, vd.series_cover_url, sub.cover, row.cover])),
+        description: pick([vd.series_intro, sub.video_desc, row.item_desc]),
+        episodes: asInt(vd.episode_cnt || vd.episode_count || sub.episode_cnt || 0),
+        online,
+        publishAt: row.expected_publish_time_ms === undefined ? 0 : asInt(row.expected_publish_time_ms),
+        note: pick([row.expected_rec_text, row.subscribe_desc]).slice(0, 120),
+        updatedAt: asInt(row.subscribe_time || row.create_time)
+      });
+    }
+    return { items };
   }
   if (['favorites', 'history', 'progressGet', 'libraryDetails', 'libraryDetail'].includes(action)) {
     if (Number(response.code) !== 0) throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
@@ -4197,6 +4318,19 @@ spider.accountParse = function (action, text) {
     var key = text(scope) || "all";
     var result = await spider.feed(page, key);
     var items = dramas(listOf(result));
+    // 启动选剧层要「拿到剧就能播」，不能每部再逐条拉 detail（慢且重复）。
+    // spider.feed 解析 discovery 响应时已把每部剧的全集 vid 存进内存 details，
+    // 这里直接带出成 episodes（字符串数组，与 detail.chapters[].videoUrl 去掉前缀后同构），
+    // 宿主拿到即可起播。details 没命中（如翻页状态重建）时省略该字段，宿主回退 detail。
+    for (var i = 0; i < items.length; i++) {
+      var cached = globalThis.__hongguoFeedDetails && globalThis.__hongguoFeedDetails.get(items[i].sourceId || stripId(items[i].id));
+      var list = cached && cached.data && cached.data.video_list;
+      if (Array.isArray(list) && list.length) {
+        items[i].episodes = list.map(function (v) { return String(v && (v.vid || v.video_id) || ''); })
+          .filter(function (vid) { return /^[1-9]\d{0,29}$/.test(vid); });
+        if (!items[i].episodes.length) delete items[i].episodes;
+      }
+    }
     var pageCount = Math.max(1, Math.floor(Number(result && result.pagecount) || page));
     return { items: items, hasMore: items.length > 0 && page < pageCount, page: page };
   }
@@ -5476,6 +5610,653 @@ spider.accountParse = function (action, text) {
   var sessionCookie = cacheGet(COOKIE_KEY);
   var sessionDevice = cacheGet(DEVICE_KEY);
 
+  // ===== App 通道手机验证：签名栈 + 状态机（移植自 hongguo-android，12 golden 向量校验）=====
+  var AppPhoneLogin = (function () {
+/* ===== App 通道手机验证（内联片段，包在账号模块 IIFE 内） ===== */
+/* 移植自 hongguo-android AccountRepository/AppPhoneLogin，签名栈经 12 个 golden 向量逐字节校验 */
+var APP_SIGN_CONST = {"sbox_b64": "+n0Ia5xZs0sEXznQOEqRmQBnpiCf9U2Ccybu3xhmgzOAAxn72f6uqqmwUsYL83klTni0NqxdGieeiNu9PGPsSRXBMB/cuFbUbM3KCUPINaPvHvSW0vwOcnuUhNHqRVpiAj/TEoE0K91+5ijypUYTATsh9mE3KSoN7Yyvv51cuyR2D3XkU4nhmI2xmmVwT1RMWKtub4sjxAcRDLrPoKSO2AU9FLLadMPX577Wf95IFj6FkKFVt3dCIsmGUC4X+WQxLJvxbRxEaOPpqJOXyzJX6+Vxaq3AzMfF/WAdoi1Hp+JRaV56zgpBtpWP97mH4DoGEIq1+FvV8LyS/3wvwugbQOwb2r26mJEMsiuDQTRn+wrYdrVGBVlhI3WQhyrjUBVMrLF5667llUcEaPCGPVGLD8qO5LlO8hKCvA7V9+8oJc9bXelqVQLhM76T5/WtnT45JKji+hdX0HoNCDDWuKON/QeaxB5uImSX0h2wv0VmP2zd2yeApxHcpsVS+MC2yFwAc2B7oBkTqsk1SEvTpM2fmfMQREBUfin0Bh+iq6EvPPavhWI2IX9e3yAas7Tm/3KEj2UmlFp36kN4x0rMLBRrxuh0U/zUHM4xcAMYjJY4MonxOl/X+alpt2M3WMI7w3HLnpIBigtNiJu7T21v4P6lSd5WFgntnMEt7oF92XzRLkJbTcGmXepE/UVOG6E/0YnhfS+q26utWcuxzpooyeD2cDlK1/8w9d28VzsRjbLuALbmGlp8+d7EzS6Au7lMpZ+ECMZvQmzwJ+eLOpxR+2chdUExp8ogQyq3v9l68rX4jCwjg0+PYKAEEzcU4wHFY2ZcdIHfWL1okD3SszT0GZMyKdZJrg1L2AeerB4tC0C4crp2EHGo5FYdSP7lwkeR2ocmnR+Ia8CYviUJlzOjhRZef9xuVOn3qcjow3fQgivsAmKKkg4+sA8F8/GWeDiGNhg8JM8KtFPMYWWkx5TVFX5t73kiNRJqjlIGVXtGZFCV4gzt0xcDopuZ6xz8r9Rzafpf9ywev8jh8592gHFIqpStZPuJxmDDMrNN0uBE3V+oscdoIzTJbRJ/t+sVvqnReJOgDJKk10fjisJwqyZBmnmn2BSFj8BvVtCMEbkuPOKdzw7eA11GPs04Qw8zWtkaZWwiO/wwpojqN6K0jY5RnNZA7vn4hPSul+nKCkVnVwQvg1zVxcSCtqORmB9KrJaBbssbCQivGJVJfVTt+hYxOtq4ZvWl8f4QAQZ0zGPffCgl9s6yT4vlvIdpu4YhBwA25wtQWZsc6GJYGWHyvSdeuh3mmUI9DSq13Fsp8C1MU3tqc04/df9LoTUXVXI5INOw/e8C7Hd+5CvbkMEFnnrUUmskEw==", "hashTable": [-340373585, 128638146, -818837569, -535742209, 1829502207, 1513137086, -1273309640, 873991864, -231478417, -1314552628, -859632185, 1204935505, -715762722, 1890078625, 1464286226, -143719800, 738688778, -636630320, -71798932, -37433600, 1753874957, -428423514, -1932119157, 440175886, -857165717, 1792077067, -1605228777, -596530045, 579197809, -709567066, 1936688720, 1700802668, 1635574438, -467451522, 172024131, 1414414386, -1998587094, 1902910176, 1279687304, 95566771, -506415002, -1163666248, -1372359469, -1019733424, 386070363, -26369176, -256585912, 1309670328, 1923797261, 650459709, -222502666, -1269467775, 1243971549, -1942912350, -1425327226, 1029569300, 1326462516, -746892585, 1146027798, -351652911, 1822977902, 2640807, 137919738, 1605596550], "device": {"ac": "wifi", "channel": "update_64", "aid": "8662", "app_name": "novelread", "version_code": "71332", "version_name": "7.1.3.32", "device_platform": "android", "os": "android", "ssmix": "a", "device_type": "25053RT47C", "device_brand": "Redmi", "language": "zh", "os_api": "36", "os_version": "16", "manifest_version_code": "71332", "resolution": "1280*2772", "dpi": "520", "update_version_code": "71332", "host_abi": "arm64-v8a", "dragon_device_type": "phone", "pv_player": "71332", "compliance_status": "0", "need_personal_recommend": "1", "player_so_load": "1", "is_android_pad_screen": "0"}, "VIDEO_UA": "com.phoenix.read/71332 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)", "APP_UA": "com.phoenix.read/72232 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3)"};
+
+// App 通道签名栈：逐行翻译自 OOIUa/hongguo-android 的 account/protocol
+// (Bytes.kt / AesV3.kt / Signer.kt / VendorConstants.kt)，仅 32 位 hash 分支。
+// 用 Int32 (`|0`) 模拟 Kotlin Int 溢出，用 BigInt 模拟 Long 运算。
+
+// ---------- 字节工具（对应 Bytes.kt） ----------
+const u = b => b & 255;
+function hexBytes(s) { return Uint8Array.from(s.match(/../g).map(x => parseInt(x, 16))); }
+function bytesHex(b) { return Array.from(b).map(x => ((x & 255).toString(16)).padStart(2, '0')).join(''); }
+function b64decode(s) {
+  const norm = s.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = g.atob(norm.padEnd(Math.ceil(norm.length / 4) * 4, '='));
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+function b64(bytes) {
+  let str = ''; for (const b of bytes) str += String.fromCharCode(b); return g.btoa(str);
+}
+function le32(n) { n |= 0; return Uint8Array.from([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]); }
+function be32(n) { n |= 0; return Uint8Array.from([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]); }
+function le64(n) { // BigInt
+  const o = new Uint8Array(8); for (let i = 0; i < 8; i++) o[i] = Number((n >> BigInt(8 * i)) & 255n); return o;
+}
+function i32(at, little = false) {
+  const b = at;
+  return little
+    ? (b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)) | 0
+    : ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]) | 0;
+}
+function i64(at, little = false) { // -> BigInt signed
+  let v = 0n;
+  if (little) for (let i = 7; i >= 0; i--) v = (v << 8n) | BigInt(at[i] & 255);
+  else for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(at[i] & 255);
+  if (v >= (1n << 63n)) v -= (1n << 64n);
+  return v;
+}
+function xor(a, b) { const o = new Uint8Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] ^ b[i % b.length]; return o; }
+function rol(v, n) { v |= 0; n &= 31; return ((v << n) | (v >>> (32 - n))) | 0; }
+function ror(v, n) { v |= 0; n &= 31; return ((v >>> n) | (v << (32 - n))) | 0; }
+const cat = (...arrs) => Uint8Array.from(arrs.flatMap(a => Array.from(a)));
+
+// ---------- MD5（标准实现，对应 MessageDigest("MD5")） ----------
+const MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+const MD5_K = Array.from({length:64}, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0);
+function md5(bytes) {
+  const msg = Array.from(bytes); const bitLen = BigInt(msg.length * 8);
+  msg.push(0x80); while (msg.length % 64 !== 56) msg.push(0);
+  for (let i = 0; i < 8; i++) msg.push(Number((bitLen >> BigInt(8 * i)) & 255n));
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (let off = 0; off < msg.length; off += 64) {
+    const M = []; for (let j = 0; j < 16; j++) M.push(i32(msg.slice(off + j * 4), true));
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, G;
+      if (i < 16) { F = (B & C) | (~B & D); G = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); G = (5 * i + 1) % 16; }
+      else if (i < 48) { F = B ^ C ^ D; G = (3 * i + 5) % 16; }
+      else { F = C ^ (B | ~D); G = (7 * i) % 16; }
+      const tmp = D; D = C; C = B;
+      B = (B + rol((A + F + MD5_K[i] + M[G]) | 0, MD5_S[i])) | 0; A = tmp;
+    }
+    a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+  }
+  return cat(le32(a0), le32(b0), le32(c0), le32(d0));
+}
+
+// ---------- SM3（对应 BouncyCastle SM3Digest） ----------
+function sm3(bytes) {
+  const P0 = x => (x ^ rol(x, 9) ^ rol(x, 17)) | 0;
+  const P1 = x => (x ^ rol(x, 15) ^ rol(x, 23)) | 0;
+  const FF = (j, x, y, z) => j < 16 ? (x ^ y ^ z) : ((x & y) | (x & z) | (y & z));
+  const GG = (j, x, y, z) => j < 16 ? (x ^ y ^ z) : ((x & y) | (~x & z));
+  const IV = [0x7380166f,0x4914b2b9,0x172442d7,0xda8a0600,0xa96f30bc,0x163138aa,0xe38dee4d,0xb0fb0e4e].map(x => x | 0);
+  const msg = Array.from(bytes); const bitLen = BigInt(msg.length * 8);
+  msg.push(0x80); while (msg.length % 64 !== 56) msg.push(0);
+  for (let i = 7; i >= 0; i--) msg.push(Number((bitLen >> BigInt(8 * i)) & 255n));
+  const V = IV.slice();
+  for (let off = 0; off < msg.length; off += 64) {
+    const W = new Array(68);
+    for (let j = 0; j < 16; j++) W[j] = i32(msg.slice(off + j * 4), false);
+    for (let j = 16; j < 68; j++) W[j] = (P1((W[j-16] ^ W[j-9] ^ rol(W[j-3], 15)) | 0) ^ rol(W[j-13], 7) ^ W[j-6]) | 0;
+    let [A,B,C,D,E,F,G,H] = V;
+    for (let j = 0; j < 64; j++) {
+      const Tj = j < 16 ? 0x79cc4519 : 0x7a879d8a;
+      const SS1 = rol((rol(A, 12) + E + rol(Tj, j)) | 0, 7);
+      const SS2 = (SS1 ^ rol(A, 12)) | 0;
+      const TT1 = (FF(j,A,B,C) + D + SS2 + (W[j] ^ W[j+4])) | 0;
+      const TT2 = (GG(j,E,F,G) + H + SS1 + W[j]) | 0;
+      D = C; C = rol(B, 9); B = A; A = TT1;
+      H = G; G = rol(F, 19); F = E; E = P0(TT2);
+    }
+    V[0]=(V[0]^A)|0; V[1]=(V[1]^B)|0; V[2]=(V[2]^C)|0; V[3]=(V[3]^D)|0;
+    V[4]=(V[4]^E)|0; V[5]=(V[5]^F)|0; V[6]=(V[6]^G)|0; V[7]=(V[7]^H)|0;
+  }
+  return cat(...V.map(be32));
+}
+
+
+// ---------- 常量（对应 VendorConstants.kt） ----------
+const CONST = APP_SIGN_CONST;
+const HASH_TABLE = CONST.hashTable.map(x => x | 0);
+const SBOX = Array.from(b64decode(CONST.sbox_b64)).map(u);
+const VIDEO_UA = CONST.VIDEO_UA;
+const APP_UA = CONST.APP_UA;
+const DEVICE = Object.assign({}, CONST.device);
+
+// protobuf varint（value 为 Long，这里用 BigInt 保险）
+function varint(value) {
+  let n = BigInt(value); const out = [];
+  while (n > 127n) { out.push(Number((n & 127n) | 128n)); n >>= 7n; }
+  out.push(Number(n)); return Uint8Array.from(out);
+}
+// Field(tag, value, type) -> bytes
+function proto(fields) {
+  const out = [];
+  for (const f of fields) {
+    const tag = f[0], value = f[1], type = f[2] || 'string';
+    if (type === 'sint') {
+      const n = BigInt(value);
+      const zz = n < 0n ? (-n * 2n - 1n) : (n * 2n);
+      out.push(varint(BigInt(tag) << 3n), varint(zz));
+    } else if (type === 'float') {
+      const tagwire = (BigInt(tag) << 3n) | 5n;
+      const buf = new ArrayBuffer(4); new DataView(buf).setFloat32(0, Number(value), true);
+      out.push(varint(tagwire), new Uint8Array(buf));
+    } else {
+      const bytes = value instanceof Uint8Array ? value : Uint8Array.from(Buffer.from(String(value), 'utf8'));
+      if (bytes.length) out.push(varint((BigInt(tag) << 3n) | 2n), varint(bytes.length), bytes);
+    }
+  }
+  return cat(...out);
+}
+
+function getIv(initial, data) {
+  let value = initial | 0;
+  for (let i = 0; i < data.length; i++) {
+    const b = u(data[i]);
+    value = (i & 1) === 0
+      ? ((((value >>> 4) ^ value ^ (value << 6)) | 0) ^ b) | 0
+      : (~(((value >>> 7) ^ value ^ (b | (value << 12))) | 0)) | 0;
+  }
+  return value | 0;
+}
+function iv(query, body, ts) {
+  return getIv(getIv(getIv(0x20230928, query), body), le32(ts));
+}
+function branch(query, body, ts) {
+  return (iv(sm3(query), body ? md5(body) : new Uint8Array(16), ts) & 15) % 3;
+}
+function unsigned(v) { return BigInt(v | 0) & 0xffffffffn; }
+
+function sumMd5(data) {
+  let check = 0x20220420 | 0;
+  for (let i = 0; i < 12; i++) {
+    const temp = (check >>> ((i & 1) === 0 ? 3 : 5)) ^ check;
+    check = (i & 1) === 0
+      ? (u(data[i]) ^ (check << 7)) | 0
+      : (~(u(data[i]) | (check << 11))) | 0;
+    check = (check ^ temp) | 0;
+  }
+  return ((check | 4) ^ 0x1000000) | 0;
+}
+function hashF13(query, body, ts) {
+  const ivv = iv(query, body, ts) & 15;
+  const index = Math.floor(ivv / 3);
+  const ivV1 = [0xc4a78580,0xb3c0fd39,0xc58c5686,0xc9aa3ba7,0xf5a7adf2,0x963c2ed1][index] | 0;
+  const count = (ivV1 + ts) | 0;
+  const tt = HASH_TABLE.map(x => ror(x, (count + 1) & 255));
+  const shift = (count + 2) & 7;
+  const pad = Uint8Array.from([0xfa,0x45,0x61,0xd7].map(x => ((x | (x << 8)) >>> shift) & 255));
+  const data = cat(query, body, le32(ts), pad, hexBytes('00000000000001a0'));
+  const di = [];
+  for (let at = 0; at < data.length; at += 4) di.push(i32(data.slice(at), false));
+  for (let i = 0; i < 112; i++) {
+    const x = di[i+1], y = di[i+14];
+    di.push((di[i] + di[i+9] + (rol(x,14) ^ rol(x,25) ^ (x >>> 3)) + (rol(y,13) ^ rol(y,15) ^ (y >>> 10))) | 0);
+  }
+  const initial = [0x7aba4fc8,0x67166507,0x6403fa00,0x340f512f,984304912,3005047866,2874125293,2152413264].map(x => ror(x, count));
+  const chosen = [
+    [101,5,7,6,3,2,1,0,5,4,3], [96,0,6,7,5,3,2,1,5,4,4],
+    [96,7,6,2,1,4,0,5,4,3,5], [99,3,6,2,4,5,1,0,0,7,6],
+    [96,0,5,6,7,3,1,2,5,4,4], [100,2,0,3,5,4,6,7,2,1,5]
+  ][index];
+  const d = initial.slice();
+  for (let i = 0; i < chosen[0]; i++) {
+    const base = (ivV1 + i) | 0;
+    const n1 = ((((d[chosen[3]] ^ d[chosen[4]]) & d[chosen[1]]) ^ d[chosen[3]]) | 0);
+    const n2 = (rol(d[chosen[1]],26) ^ rol(d[chosen[1]],21) ^ rol(d[chosen[1]],7)) | 0;
+    const n4 = (di[base & 127] + n1 + n2 + tt[base & 63] + d[chosen[5]]) | 0;
+    const n5 = (rol(d[chosen[2]],30) ^ rol(d[chosen[2]],19) ^ rol(d[chosen[2]],10)) | 0;
+    const n6 = ((d[chosen[2]] & d[chosen[6]]) | ((d[chosen[2]] | d[chosen[6]]) & d[chosen[7]])) | 0;
+    const old = d[chosen[9]];
+    d.unshift(d.splice(7, 1)[0]);
+    d[chosen[10]] = (n5 + n6 + n4) | 0;
+    d[chosen[8]] = (old + n4) | 0;
+  }
+  const ret = cat(...Array.from({length:8}, (_, i) => be32((d[i] + initial[i]) | 0)));
+  const folded = xor(ret.slice(0,16), ret.slice(16,32));
+  return cat(folded, le32(sumMd5(folded)));
+}
+
+function gorgon(query, body, ts, rand) {
+  const input = cat(
+    md5(query).slice(0,4),
+    body ? md5(body).slice(0,4) : new Uint8Array(4),
+    new Uint8Array(4), le32(67503104), be32(ts)
+  );
+  const key = Uint8Array.from([0x4a,0x40,0x16,(rand >>> 8) & 255,0x47,0x6c,1,rand & 255]);
+  const s = Array.from({length:256}, (_, i) => i);
+  let j = 0;
+  for (let i = 0; i <= 255; i++) { j = (j + s[i] + key[i % 8]) & 255; s[i] = s[j]; } // 只赋值，非 swap（Kotlin 原样）
+  j = 0;
+  const out = new Uint8Array(input.length);
+  for (let n = 0; n < input.length; n++) {
+    const i = n + 1; j += s[i]; const y = s[j & 255]; s[i] = y;
+    out[n] = u(input[n]) ^ s[(y + y) & 255];
+  }
+  for (let i = 0; i < out.length; i++) {
+    const value = ((u(out[i]) >>> 4) | (u(out[i]) << 4)) & 255;
+    const next = u(out[(i + 1 < out.length) ? i + 1 : 0]);
+    const reversed = reverse32((next ^ value) & 255) >>> 24;
+    out[i] = (~((reversed ^ 20) & 255)) & 255;
+  }
+  return bytesHex(cat(hexBytes('8404'), Uint8Array.from([rand & 255,(rand >>> 8) & 255,0x40,1]), out));
+}
+function reverse32(x) {
+  x = x | 0;
+  x = ((x >>> 1) & 0x55555555) | ((x & 0x55555555) << 1);
+  x = ((x >>> 2) & 0x33333333) | ((x & 0x33333333) << 2);
+  x = ((x >>> 4) & 0x0f0f0f0f) | ((x & 0x0f0f0f0f) << 4);
+  x = ((x >>> 8) & 0x00ff00ff) | ((x & 0x00ff00ff) << 8);
+  x = ((x >>> 16) & 0x0000ffff) | ((x & 0x0000ffff) << 16);
+  return x | 0;
+}
+
+function xmxor(data, key) {
+  const encoded = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i++) {
+    const at = (i * 4) & 28, d0 = u(key[at]), d1 = u(key[at+1]), v = u(data[i]);
+    let d2 = ((((v << 4) | (v >>> 4)) & 255) + d0) & 255;
+    d2 = (~d2) ^ d1;
+    d2 = ((((d2 & 255) << 3) | ((d2 & 255) >>> 5)) & 255);
+    d2 = (d2 + d1) & 255;
+    d2 = (d2 ^ d0) & 255;
+    encoded[data.length - i - 1] = (~d2) & 255;
+  }
+  const last = encoded[encoded.length-1] ^ encoded[encoded.length-2];
+  const first = encoded[0];
+  encoded[0] = ((~last) + first) & 255;
+  encoded[1] = ((encoded[0] ^ encoded[encoded.length-1] ^ 254) + encoded[1]) & 255;
+  encoded[2] = (encoded[2] + ((last - first) ^ (((encoded[1] << 3) | (encoded[1] >>> 5)) & 255) ^ 2)) & 255;
+  for (let i = 0; i < encoded.length - 4; i++) {
+    const temp = ((((encoded[i+2] << 3) | (encoded[i+2] >>> 5)) & 255) ^ encoded[i+1] ^ (i+3));
+    encoded[i+3] = ((~temp) + encoded[i+3]) & 255;
+  }
+  encoded[encoded.length-1] = encoded[encoded.length-1] ^ encoded[encoded.length-2];
+  encoded[0] = ((encoded[0] ^ encoded[1]) + Array.from(encoded.slice(1)).reduce((a,b)=>a+b,0)) & 255;
+  return encoded;
+}
+
+// AesV3（对应 AesV3.kt，非标准协议专用变换）
+function AesV3(key, timestamp) {
+  const word = timestamp & 3;
+  const box = SBOX.slice(word*256, (word+1)*256).map(u);
+  const con = [[1,0,2,3],[2,0,3,1],[0,1,3,2],[1,0,2,3]][word];
+  const order = [
+    [0,9,14,11,4,13,2,7,8,1,6,15,12,5,10,3],
+    [0,9,14,15,4,13,2,7,8,1,6,3,12,5,10,11],
+    [0,9,14,7,4,13,2,11,8,1,6,3,12,5,10,15],
+    [0,9,14,11,4,13,2,7,8,1,6,15,12,5,10,3]
+  ][word];
+  const initial = [0xca025ddc,0x823dc546,0xc9420583,0xc298225f][word] | 0;
+  const base = cat(le32(initial),le32(initial),le32(initial),le32(initial));
+  const expanded = Array.from(cat(xor(base,key), new Uint8Array(32))).map(u); // xor(base, key) + 32零
+  let rounds = 8;
+  for (let i = 4; i < 12; i++) {
+    let at = 4*(i-1), a=expanded[at], b=expanded[at+1], c=expanded[at+2], d=expanded[at+3];
+    if ((i & 3) === 0) { const t = ((initial >>> (rounds & 24)) ^ box[b]) & 255; b=box[c]; c=box[d]; d=box[a]; a=t; }
+    rounds += 2;
+    expanded[at+4]=a^expanded[at-12]; expanded[at+5]=b^expanded[at-11];
+    expanded[at+6]=c^expanded[at-10]; expanded[at+7]=d^expanded[at-9];
+  }
+  const keys = Array.from({length:12}, (_, i) => expanded.slice(i*4, i*4+4));
+  function xt(x) { return ((x << 1) ^ ((x & 128) ? 0x1b : 0)) & 255; }
+  function block(value) {
+    const rows = Array.from({length:4}, (_, i) => Array.from({length:4}, (_, j) => u(value[i*4+j])));
+    function addCon(off) { for (let i=0;i<4;i++) for(let j=0;j<4;j++) rows[i][j]^=keys[off+i][con[j]]; }
+    addCon(0);
+    for (let round=1; round<=2; round++) {
+      for (let i=0;i<4;i++) for(let j=0;j<4;j++) rows[i][j]=box[rows[i][j]];
+      const before = rows.map(r=>r.slice());
+      for (let i=0;i<4;i++) rows[i]=before[con[i]].slice();
+      const flat = rows.flat();
+      for (let i=0;i<16;i++) rows[(i/4)|0][i%4]=flat[order[i]];
+      if (round===1) {
+        for (let i=0;i<4;i++) { const old=rows[i].slice(); rows[i]=Array.from({length:4},(_,t)=>old[con[t]]); }
+        for (let i=0;i<4;i++) {
+          const t=rows[0][i]^rows[1][i]^rows[2][i]^rows[3][i], old=rows[0][i];
+          rows[0][i]^=t^xt(rows[0][i]^rows[1][i]);
+          rows[1][i]^=t^xt(rows[1][i]^rows[2][i]);
+          rows[2][i]^=t^xt(rows[2][i]^rows[3][i]);
+          rows[3][i]^=t^xt(rows[3][i]^old);
+        }
+      }
+      addCon(round*4);
+    }
+    for (let i=0;i<4;i++) for(let j=0;j<4;j++) rows[i][j]^=keys[4+i][j];
+    return Uint8Array.from(rows.flat());
+  }
+  function encrypt(source, ivv) {
+    const plaintext = new Uint8Array(32);
+    for (let i=0;i<31;i++) {
+      const at=i*8;
+      plaintext[i]=(((u(source[at])>>>4)&2)|(u(source[at+1])&64)|((u(source[at+2])>>>2)&1)|((u(source[at+3])<<3)&128)|((u(source[at+4])>>>1)&4)|((u(source[at+5])<<3)&16)|((u(source[at+6])<<5)&32)|((u(source[at+7])>>>4)&8))&255;
+    }
+    plaintext[31]=1;
+    const first=block(xor(plaintext.slice(0,16),ivv));
+    const key2=cat(first, block(xor(plaintext.slice(16,32),first)));
+    const out=source.slice();
+    for (let i=0;i<31;i++) {
+      const at=i*8, k=u(key2[i]);
+      out[at]=((u(out[at])&0xdf)|((k<<4)&32))&255;
+      out[at+1]=((u(out[at+1])&0xbf)|(k&64))&255;
+      out[at+2]=((u(out[at+2])&0xfb)|((k<<2)&4))&255;
+      out[at+3]=((u(out[at+3])&0xef)|((k>>>3)&16))&255;
+      out[at+4]=((u(out[at+4])&0xf7)|((k+k)&8))&255;
+      out[at+5]=((u(out[at+5])&0xfd)|((k>>>3)&2))&255;
+      out[at+6]=((u(out[at+6])&0xfe)|((k>>>5)&1))&255;
+      out[at+7]=((u(out[at+7])&0x7f)|((k<<4)&128))&255;
+    }
+    return cat(Uint8Array.from([key2[key2.length-1]]), out);
+  }
+  return { encrypt };
+}
+
+function deviceProto(device) {
+  return proto([
+    [1,1,'sint'],[2,2,'sint'],[3,'8662'],[4,device['device_id']],[5,'Ai6svO3PyrwDOUSmO6ZcResxu'],
+    [6,'!noperm!'],[7,-888888,'sint'],[8,-888888,'sint'],[9,3,'sint'],[10,-888888,'sint'],
+    [11,'!notset!'],[12,'Asia/Shanghai,8'],[13,'zh_CN'],[14,4,'sint'],
+    [16,255.24993896484375,'float'],[17,35.58599090576172,'float'],[18,3.467449188232422,'float'],
+    [19,3.467449188232422,'float'],[20,255.1754913330078,'float'],[21,42.17544174194336,'float'],
+    [22,'16'],[23,41,'sint'],[24,36,'sint'],[25,1728388016635,'sint'],[26,1728388016635,'sint'],
+    [27,1728388016635,'sint'],[28,1728388016637,'sint'],[29,-1,'sint'],[30,'25053RT47C'],[31,'Redmi'],
+    [32,'25053RT47C'],[33,'25053RT47C'],[34,'Xiaomi'],[35,'Redmi'],[36,'Redmi'],[38,31,'sint']
+  ]);
+}
+
+function medusa(url, body, ts, opts) {
+  const device = opts.device;
+  const bodyMd5 = body ? md5(body) : new Uint8Array(16);
+  const query = url.includes('?') ? url.slice(url.indexOf('?')+1) : url;
+  const queryBytes = Uint8Array.from(Buffer.from(query,'utf8'));
+  const querySm3 = sm3(queryBytes);
+  const queryBodyTs = hashF13(querySm3, bodyMd5, ts);
+  const nested = proto([[1,111,'sint'],[2,10,'sint'],[3,694367,'sint'],[5,586952199,'sint']]);
+  const messageRand = unsigned(opts.rand());
+  const envLaunch = Math.floor(opts.random()*21)+100;
+  const envPid = Math.floor(opts.random()*2000)+10001;
+  const version = device['version_name'];
+  const env = proto([
+    [1,envLaunch,'sint'],[2,146331399,'sint'],[3,146331396,'sint'],[5,7,'sint'],[6,'v04.06.04.03-bugfix'],
+    [7,envPid,'sint'],[12,deviceProto(device)],[13,proto([[1,Math.floor(opts.clock()/1000),'sint'],[2,-2,'sint'],[4,200,'sint']])],[14,version]
+  ]);
+  const queryHash = sm3(cat(queryBytes, bodyMd5, Uint8Array.from(Buffer.from('none'))));
+  const message = proto([
+    [1,hexBytes('f7e85ffad7d7dc3bd62ac87057cf6118')],[2,3,'sint'],[3,messageRand,'sint'],[4,'8662'],
+    [5,device['device_id']],[6,'1588093228'],[7,version],[8,'v04.06.04-ml-android'],[9,67503104,'sint'],
+    [10,hexBytes('4001000000000000')],[12,ts,'sint'],[13,queryBodyTs],[14,querySm3.slice(0,6)],[15,nested],
+    [16,'AXYQOS6n2m60x1fVZHIrH3iol'],[17,ts,'sint'],[19,queryHash],[20,'none'],[21,312,'sint'],[23,env],
+    [24,'{"cmr":16777216,"cmr2":16777216,"un_h":1879194040,"vpn":0,"kd":0,"fkd":3672518972,"pd":-1872573247,"dyn":"","do":0,"tk":true}']
+  ]);
+  const r = opts.rand();
+  const signKey = hexBytes('8ebdfa3806ecc5cee79423e6029ed82540bc2218bb7eaef71cb691f7aa8aa2f5');
+  const hash = sm3(cat(signKey, le32(r), signKey));
+  const d1 = (r >>> 16) & 255;
+  const seedVal = (~((((d1 << 11) | (r >>> 24)) ^ (d1 >>> 5) ^ d1))) | 0;
+  const seed = le32(seedVal);
+  const transformed = Array.from(cat(hexBytes('4001000000000000'), xmxor(message, hash))).reverse();
+  for (let i=0;i<transformed.length;i++) transformed[i] = (u(transformed[i]) ^ u(seed[(~i) & 3])) & 255; // i.inv() and 3
+  const check = (((u(querySm3[0]) & 63) << 14) | 0x18000001 | ((u(queryBodyTs[0]) & 63) << 8)) | 0;
+  const packed = cat(Uint8Array.from([0x35]), le32(opts.rand()), le32(check), Uint8Array.from(transformed), Uint8Array.from([(r>>>16)&255,(r>>>24)&255]));
+  const encrypted = AesV3(hexBytes('f1593376766ea98d34f31b057a9d5be4'), ts).encrypt(packed, hexBytes('1fe109a4125283f418de9e051a969e12'));
+  const versionBytes = hexBytes('03000000f7e85ffad7d7dc3bd62ac87057cf6118');
+  const prefix = cat(...Array.from({length:5}, (_, k) => { const at=k*4; return le32((i32(versionBytes.slice(at), true) ^ ts) | 0); }));
+  return b64(cat(prefix, Uint8Array.from([r & 255,(r>>>8)&255,0,1]), encrypted));
+}
+
+function helios(ts, opts) {
+  const random = opts.rand();
+  const ascii = Array.from(bytesHex(md5(cat(le32(random), Uint8Array.from(Buffer.from('8662')))))).map(c=>c.charCodeAt(0));
+  const words = Array.from({length:4}, (_, i) => i64(ascii.slice(i*8), true));
+  const table = [words[0]];
+  let b0 = words[0], b8 = words[1];
+  const rest = [words[2], words[3]];
+  const rotR64 = (x, n) => { const b = BigInt(n); return ((x >> b) | (x << (64n - b))) & 0xffffffffffffffffn; };
+  for (let i = 0; i < 34; i++) {
+    let x8 = ((rotR64(b8, 8) + b0) & 0xffffffffffffffffn) ^ BigInt(i);
+    rest.push(x8);
+    x8 = (x8 ^ rotR64(b0, 61)) & 0xffffffffffffffffn;
+    table.push(x8);
+    b0 = x8;
+    b8 = rest.shift();
+  }
+  const text = Uint8Array.from(Buffer.from(`${ts}-1588093228-8662`));
+  const padding = 16 - (text.length % 16);
+  const data = cat(text, Uint8Array.from(Array(padding).fill(padding)));
+  let output = Array.from(le32(random));
+  for (let at = 0; at < data.length; at += 16) {
+    let a = i64(data.slice(at), true), b = i64(data.slice(at+8), true);
+    for (let i = 0; i < 34; i++) {
+      b = (table[i] ^ ((a + rotR64(b, 8)) & 0xffffffffffffffffn)) & 0xffffffffffffffffn;
+      a = (b ^ rotR64(a, 61)) & 0xffffffffffffffffn;
+    }
+    output = output.concat(Array.from(le64(a)), Array.from(le64(b)));
+  }
+  return b64(Uint8Array.from(output));
+}
+
+function urlEncode(v) { return encodeURIComponent(String(v)).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase()); }
+function encodeParams(values) { return Object.entries(values).map(([k,v]) => `${urlEncode(k)}=${urlEncode(v)}`).join('&'); }
+
+// 构造签名请求（对应 Signer.sign）
+function sign(base, values, body, opts) {
+  const now = opts.clock(); const ts = Math.floor(now / 1000) | 0;
+  let ticket;
+  for (let offset = 0; offset <= 127; offset++) {
+    ticket = now + offset;
+    const query = encodeParams(Object.assign({}, values, { ts: String(ts), _rticket: String(ticket) }));
+    const queryBytes = Uint8Array.from(Buffer.from(query, 'utf8'));
+    const bodyBytes = body ? Uint8Array.from(Buffer.from(body, 'utf8')) : null;
+    if (branch(queryBytes, bodyBytes, ts) === 0) {
+      const url = base + '?' + query;
+      const random = Math.floor(opts.random() * 65536) | 0;
+      const headers = {
+        'User-Agent': bodyBytes ? VIDEO_UA : APP_UA,
+        'Accept': 'application/json; charset=utf-8,application/x-protobuf',
+        'x-ss-req-ticket': String(ticket),
+        'x-tt-request-tag': 't=0;n=0',
+        'sdk-version': '2',
+        'passport-sdk-version': '50561',
+        'x-xs-from-web': '0',
+        'x-khronos': String(ts),
+        'x-ladon': b64(be32(ts)),
+        'x-argus': b64(le32(ts)),
+        'x-gorgon': gorgon(queryBytes, bodyBytes, ts, random),
+        'x-helios': helios(ts, opts),
+        'x-medusa': medusa(url, bodyBytes, ts, opts),
+        'x-tt-dt': ''
+      };
+      if (bodyBytes) {
+        headers['Content-Type'] = 'application/json; charset=UTF-8';
+        headers['x-vc-bdturing-sdk-version'] = '3.7.2.cn';
+        headers['x-ss-stub'] = bytesHex(md5(bodyBytes)).toUpperCase();
+      }
+      return { url, headers, body: bodyBytes, ts, ticket };
+    }
+  }
+  throw new Error('无法生成请求签名');
+}
+
+var APP_SIGNER = { sign: sign, encodeParams: encodeParams, md5: md5, sm3: sm3, branch: branch, device: DEVICE };
+
+
+// App 通道状态机：一次 send + 一次 verify 构成一次登录尝试
+var AppPhoneLogin = (function () {
+  var PASSPORT = 'https://security.snssdk.com';
+  var DEVICE_ID = '1905892595378490';
+  var INSTALL_ID = '1905892595382586';
+  var LOGIN_CODE_TYPE = '24';
+  var VERIFY_FIELD = 'verify_center_decision_conf';
+  // 未登录态下哪个端点Accept由平台决定，按顺序试到拿到 sessionid 为止
+  var VERIFY_ATTEMPTS = [
+    ['/passport/mobile/sms_login/', true],
+    ['/passport/mobile/sms_login_only/', true],
+    ['/passport/mobile/sms_login_continue/', true],
+    ['/passport/mobile/validate_code/v1/', false],
+    ['/passport/mobile/validate_code/v1/', true],
+  ];
+  var UA = APP_UA;
+
+  // 会话内状态（跨 phoneCode/phoneSms 复用；uid 由宿主 currentPhone 传入做兜底）
+  var mobile = '';          // 形如 "138 00138000"（去掉 +86）
+  var ticket = '';
+  var sent = false;
+  var nextSmsAt = 0;
+  var submittedCodes = Object.create(null);
+  var selfCookies = {};     // 本门面自己的 cookie jar
+
+  function formatPhone(countryCode, number) {
+    var country = String(countryCode || '').trim().replace(/^\+/, '');
+    var digits = String(number || '').replace(/[\s-]/g, '');
+    if (!/^[0-9]{1,4}$/.test(country) || !/^[0-9]{5,15}$/.test(digits)) throw new Error('请输入有效手机号');
+    return '+' + country + ' ' + digits;
+  }
+  function parsePhone(raw) {
+    var value = String(raw || '').trim().replace(/[()-]/g, '');
+    if (value.charAt(0) === '+') {
+      var parts = value.split(/\s+/, 2);
+      if (parts.length !== 2) throw new Error('国际手机号请使用 +区号 手机号 格式');
+      return formatPhone(parts[0], parts[1]);
+    }
+    var digits = value.replace(/\s/g, '');
+    if (!/^1[3-9][0-9]{9}$/.test(digits)) throw new Error('请输入有效手机号');
+    return formatPhone('86', digits);
+  }
+  function fillCookies() {
+    // 结构化成 cookie 串；App 通道刻意不回传 send 阶段的 cookie
+    return Object.keys(selfCookies).map(function (k) { return k + '=' + selfCookies[k]; }).join('; ');
+  }
+  function absorb(res) {
+    var sc = headerValue(res.headers, 'set-cookie');
+    if (!sc) return;
+    String(sc).split(/,(?=\s*[^;,=]+\s*=)/).forEach(function (part) {
+      var pair = part.trim().split(';')[0], eq = pair.indexOf('=');
+      if (eq <= 0) return;
+      var k = pair.slice(0, eq).trim(), v = pair.slice(eq + 1).trim();
+      if (k && v) selfCookies[k] = v;
+    });
+  }
+  function hasSession() {
+    return !!(selfCookies.sessionid && String(selfCookies.sessionid).trim()) ||
+           !!(selfCookies.sessionid_ss && String(selfCookies.sessionid_ss).trim());
+  }
+  function str(v) { return v === undefined || v === null ? '' : String(v); }
+
+  function parseBody(text) {
+    try { return JSON.parse(str(text)); } catch (_) { return {}; }
+  }
+
+  // 用签名栈发一次 passport 请求
+  async function call(path, params, form) {
+    var device = Object.assign({}, APP_SIGNER.device, {
+      device_id: DEVICE_ID, iid: INSTALL_ID
+    });
+    ['version_code','manifest_version_code','update_version_code','pv_player'].forEach(function (k) { device[k] = '73932'; });
+    device.version_name = '7.3.9.32';
+
+    var passport = Object.assign({ aid: '8662', app_name: 'novelread', device_platform: 'android' },
+      Object.keys(params).reduce(function (m, k) { if (str(params[k])) m[k] = str(params[k]); return m; }, {}));
+    var queryDevice = {};
+    Object.keys(device).forEach(function (k) { if (k !== 'device_id' && k !== 'iid') queryDevice[k] = device[k]; });
+    var queryValues = form ? queryDevice : Object.assign({}, queryDevice, passport);
+
+    var payload = form ? APP_SIGNER.encodeParams(passport) : null;
+    var signed = APP_SIGNER.sign(PASSPORT + path, queryValues, payload, {
+      device: device,
+      clock: function () { return Date.now(); },
+      random: function () { return Math.random(); },
+      rand: function () { return (Math.random() * 4294967296) | 0; }
+    });
+    var headers = Object.assign({}, signed.headers);
+    // App 通道刻意不回传 cookie：把 send_code 的 cookie 带到 sms_login 会被判 2046
+    var res = await g.fetch(signed.url, {
+      method: payload ? 'POST' : 'GET',
+      headers: headers,
+      body: payload || '',
+      timeoutMs: 20000,
+    });
+    absorb(res);
+    var bodyText = '';
+    try { bodyText = await res.text(); } catch (_) {}
+    return { ok: res.ok, status: res.status, reply: parseBody(bodyText) };
+  }
+
+  function failure(data) {
+    var code = Number(data && data.error_code) || -1;
+    var verification = !!(data && Object.prototype.hasOwnProperty.call(data, VERIFY_FIELD));
+    var captcha = !!(data && str(data.captcha));
+    var needsWebsite = verification || captcha || code === 1105;
+    var message;
+    if (verification) message = '红果要求完成滑块验证，本次登录未完成';
+    else if (captcha) message = '红果要求额外验证，本次登录未完成';
+    else if (code === 1102 || code === 1202) message = '验证码有误，请检查后重新输入';
+    else if (code === 1103 || code === 1104) message = '验证码已失效，请重新获取后再试';
+    else if (code === 1105) message = '红果要求额外验证，本次登录未完成';
+    else if (code === 1106 || code === 1107) message = '请求过于频繁，请稍后再试';
+    else if (code === 1203) message = '错误次数过多或验证码已过期，请重新获取验证码';
+    else message = '手机号登录失败，请稍后重试';
+    var err = new Error(message + '（错误码 ' + code + '）');
+    err.code = code;
+    err.canRetryCode = !needsWebsite && (code === 1102 || code === 1202);
+    err.needsWebsite = needsWebsite;
+    return err;
+  }
+
+  // 号码形如 "+86 13800138000"；send 时去掉 "+86 " 前缀
+  function localNumber() { return mobile.indexOf('+86 ') === 0 ? mobile.slice(4) : mobile; }
+
+  async function send(number) {
+    if (Date.now() < nextSmsAt) throw new Error('请等待短信冷却后再试');
+    mobile = parsePhone(number);
+    sent = false; ticket = ''; submittedCodes = Object.create(null); selfCookies = {};
+    var reply = (await call('/passport/mobile/send_code/v1/', { mobile: localNumber(), type: LOGIN_CODE_TYPE }, false)).reply;
+    var data = reply && reply.data ? reply.data : {};
+    if (data && Object.prototype.hasOwnProperty.call(data, VERIFY_FIELD) || str(reply && reply.message) !== 'success') throw failure(data);
+    ticket = str(data.mobile_ticket);
+    var retry = Number(data.retry_time) || 60;
+    retry = Math.min(3600, Math.max(1, retry));
+    nextSmsAt = Date.now() + retry * 1000;
+    sent = true;
+    var digits = localNumber();
+    var masked = digits.length >= 7 ? digits.slice(0, 3) + '****' + digits.slice(-4) : '你的手机';
+    return { valid: true, mobile: masked, retryAfter: retry };
+  }
+
+  async function verify(code) {
+    if (!sent) throw new Error('请先重新获取验证码');
+    if (!/^[0-9]{4,8}$/.test(str(code))) throw new Error('请输入 4—8 位验证码');
+    if (submittedCodes[code]) throw Object.assign(new Error('这个验证码已提交过，请输入新的验证码'), { canRetryCode: true });
+    submittedCodes[code] = true;
+    sent = false;
+    var sawExpired = false;
+    for (var i = 0; i < VERIFY_ATTEMPTS.length; i++) {
+      var path = VERIFY_ATTEMPTS[i][0], form = VERIFY_ATTEMPTS[i][1];
+      var reply = (await call(path, {
+        mobile: localNumber(), code: str(code), type: LOGIN_CODE_TYPE, mobile_ticket: ticket
+      }, form)).reply;
+      if (hasSession()) return { valid: true, _cookies: fillCookies(), _device: JSON.stringify({ device: DEVICE_ID, installId: INSTALL_ID }) };
+      var data = reply && reply.data ? reply.data : {};
+      var newTicket = str(data.mobile_ticket);
+      if (newTicket) ticket = newTicket;
+      var ec = Number(data.error_code) || 0;
+      if (ec === 0) continue;
+      if (ec === 1) { sawExpired = true; continue; }
+      var f = failure(data);
+      sent = f.canRetryCode;
+      throw f;
+    }
+    throw new Error(sawExpired ? '登录会话已失效，请重新获取验证码' : '登录没有成功，平台没有下发登录态');
+  }
+
+  function reset() {
+    mobile = ''; ticket = ''; sent = false; nextSmsAt = 0;
+    submittedCodes = Object.create(null); selfCookies = {};
+  }
+
+  return { send: send, verify: verify, reset: reset, currentCookies: fillCookies };
+})();
+
+    return AppPhoneLogin;
+  })();
+
   function headerValue(headers, name) {
     if (!headers) return "";
     if (typeof headers.get === "function") {
@@ -5549,6 +6330,16 @@ spider.accountParse = function (action, text) {
       throw new Error("账号适配层未就绪");
     }
     options = options || {};
+    // App 通道手机验证：走官方 App passport 通道（签名 + ticket + 多端点），不再用网页通道
+    if (action === "phoneCode") {
+      // App 通道 send 阶段刻意不回传 cookie：把 send_code 下发的 cookie 带进 sms_login 会被判 2046。
+      // 登录态（sessionid）只在 verify 阶段成功后统一回传，避免 send 阶段的临时 cookie 污染会话。
+      return await AppPhoneLogin.send(String((payload && payload.number) || ""));
+    }
+    if (action === "phoneSms") {
+      var verified = await AppPhoneLogin.verify(String((payload && payload.code) || ""));
+      return verified;
+    }
     if (typeof options.cookie === "string" && options.cookie) {
       sessionCookie = options.cookie;
     }
