@@ -1500,7 +1500,10 @@ var he={...yn,version_code:"73932",version_name:"7.3.9.32",manifest_version_code
     if(!ids.length||ids.length>50)throw new Error("账号剧集编号无效");
     params.book_id=ids.map(identity).join(",");params.book_type="2";
   }
-  if(action==="favorites")params.target_user_id=identity(payload.userId);
+  // 官方 read 收藏列表（video/list）按登录态识别用户，不强制 target_user_id。
+  // 宿主 HongguoJsAccount.favorites() 调用时不传 userId，旧版这里无条件 identity(undefined)
+  // 会抛「账号剧集编号无效」，导致收藏请求 100% 失败。仅在显式给出合法 userId 时才附加。
+  if(action==="favorites"&&payload.userId&&/^[1-9]\d{0,29}$/.test(String(payload.userId)))params.target_user_id=identity(payload.userId);
   if(action==="favoriteUpdate") {
     if(!["0","1"].includes(String(payload.follow)))throw new Error("追剧状态无效");
     const add=String(payload.follow)==="1";
@@ -3384,6 +3387,44 @@ spider.accountParse = function (action, text) {
   const response = safeJsonParse(text);
   if (!response || typeof response !== 'object') throw new Error('账号接口返回无效数据');
   const data = response.data;
+  // 头像/昵称字段覆盖对齐官方 ProfileRules：头像 6 种 key + 支持 {url_list:[...]} 对象，
+  // 昵称 4 种 key（含 screen_name）。脚本旧版只认 avatar_url/avatar，官方接口下发
+  // avatar_large/avatar_thumb/screen_name 等字段时会取空 → 头像退回首字、昵称退回「红果用户」。
+  const pickAvatar = (...nodes) => {
+    const keys = ['avatar_url', 'avatar_large_url', 'avatar_large', 'avatar_medium', 'avatar_thumb', 'avatar'];
+    const tidy = raw => {
+      if (typeof raw !== 'string' || !raw.trim()) return '';
+      let url = raw.trim().replace(/^http:\/\//, 'https://');
+      if (url.startsWith('//')) url = 'https:' + url;
+      return /^https?:\/\//.test(url) ? url : '';
+    };
+    for (const node of nodes) {
+      if (!node || typeof node !== 'object') continue;
+      for (const key of keys) {
+        const value = node[key];
+        const direct = tidy(value);
+        if (direct) return direct;
+        if (value && typeof value === 'object' && Array.isArray(value.url_list)) {
+          for (const item of value.url_list) {
+            const url = tidy(typeof item === 'string' ? item : item && item.url);
+            if (url) return url;
+          }
+        }
+      }
+    }
+    return '';
+  };
+  const pickDisplayName = (...nodes) => {
+    const keys = ['screen_name', 'nickname', 'user_name', 'name'];
+    for (const node of nodes) {
+      if (!node || typeof node !== 'object') continue;
+      for (const key of keys) {
+        const value = node[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+    }
+    return '';
+  };
   if (action === 'profile') {
     const user = (data && (data.user_info || data.base_info || data.user_data || data.user || data.profile)) || data || {};
     const code = Number(response.code ?? response.status_code ?? response.err_no ?? 0);
@@ -3410,13 +3451,12 @@ spider.accountParse = function (action, text) {
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
     const rawUserId = String(user.user_id || (data && data.user_id) || '');
     const encodeUserId = rawUserId && !/^\d+$/.test(rawUserId) ? rawUserId : '';
-    const rawAvatar = user.avatar_url || user.avatar || (data && data.avatar_url) || '';
-    const avatar = typeof rawAvatar === 'string' && /^https?:\/\//.test(rawAvatar) ? rawAvatar.replace(/^http:\/\//, 'https://') : '';
+    const avatar = pickAvatar(user, data && data.user, data && data.user_info, data);
     return {
       id,
       bizUserId: pickNumericId(user.biz_user_id, data && data.biz_user_id) || id,
       encodeUserId,
-      nickname: String(user.user_name || user.nickname || user.name || (data && (data.user_name || data.nickname)) || '红果用户').slice(0, 80),
+      nickname: String(user.user_name || user.nickname || user.screen_name || user.name || pickDisplayName(data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
       avatar
     };
   }
@@ -3426,8 +3466,8 @@ spider.accountParse = function (action, text) {
     const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
     return {
       id: /^\d{1,30}$/.test(id) ? id : '',
-      nickname: String(user.name || user.user_name || user.screen_name || '红果用户').slice(0, 80),
-      avatar: typeof (user.avatar_url || user.avatar) === 'string' && /^https:\/\//.test(user.avatar_url || user.avatar) ? (user.avatar_url || user.avatar) : '',
+      nickname: String(user.name || user.user_name || user.screen_name || pickDisplayName(data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
+      avatar: pickAvatar(user, data && data.user, data && data.user_info, data),
       valid: true
     };
   }
@@ -6447,6 +6487,42 @@ var AppPhoneLogin = (function () {
     }
 
     var parsed = api.accountParse(action, await response.text());
+
+    // 云端历史列表（read_progress/list）只返回剧集 id 与播放进度，不带封面/标题。
+    // 官方 App 会再按 book_id 批量拉 multi-detail 补封面，否则「观看历史」只有空海报卡。
+    // 这里对缺封面的条目补一次详情，失败不影响历史列表本身（封面留空由宿主兜底）。
+    if (action === "history" && parsed && Array.isArray(parsed.items)) {
+      var needDetail = parsed.items.filter(function (it) {
+        return it && it.id && /^[1-9]\d{0,29}$/.test(String(it.id)) && !it.cover;
+      });
+      if (needDetail.length) {
+        try {
+          var ids = needDetail.map(function (it) { return String(it.id); }).slice(0, 50);
+          var detailReq = await api.account("libraryDetails", { ids: ids.join(",") });
+          var detailHeaders = Object.assign({}, detailReq.headers || {});
+          if (sessionCookie) detailHeaders["Cookie"] = sessionCookie;
+          var detailResp = await g.fetch(detailReq.url, {
+            method: String(detailReq.method || "GET").toUpperCase(),
+            headers: detailHeaders,
+            body: detailReq.body === undefined ? "" : detailReq.body,
+            timeoutMs: options.timeoutMs,
+          });
+          if (detailResp.ok) {
+            var detailParsed = api.accountParse("libraryDetails", await detailResp.text());
+            var byId = {};
+            (detailParsed.items || []).forEach(function (d) { if (d && d.id) byId[String(d.id)] = d; });
+            parsed.items.forEach(function (it) {
+              var d = it && byId[String(it.id)];
+              if (!d) return;
+              if (!it.cover && d.cover) it.cover = d.cover;
+              if (!it.title && d.title) it.title = d.title;
+              if (!it.description && d.description) it.description = d.description;
+              if (!it.episodes && d.episodes) it.episodes = d.episodes;
+            });
+          }
+        } catch (_) { /* 详情补齐失败：保留原列表，封面留空 */ }
+      }
+    }
 
     // 扫码确认后需要跟随 redirect 建立会话 cookie（vendor 只返回 redirect 地址）。
     if (action === "poll" && parsed.redirect) {
