@@ -4323,7 +4323,7 @@ spider.accountParse = function (action, text) {
     // 这里直接带出成 episodes（字符串数组，与 detail.chapters[].videoUrl 去掉前缀后同构），
     // 宿主拿到即可起播。details 没命中（如翻页状态重建）时省略该字段，宿主回退 detail。
     for (var i = 0; i < items.length; i++) {
-      var cached = details.get(items[i].sourceId || stripId(items[i].id));
+      var cached = globalThis.__hongguoFeedDetails && globalThis.__hongguoFeedDetails.get(items[i].sourceId || stripId(items[i].id));
       var list = cached && cached.data && cached.data.video_list;
       if (Array.isArray(list) && list.length) {
         items[i].episodes = list.map(function (v) { return String(v && (v.vid || v.video_id) || ''); })
