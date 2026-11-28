@@ -3451,31 +3451,46 @@ spider.accountParse = function (action, text) {
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
     const rawUserId = String(user.user_id || (data && data.user_id) || '');
     const encodeUserId = rawUserId && !/^\d+$/.test(rawUserId) ? rawUserId : '';
-    // 官方 ProfileRules.nodes() 遍历顺序为 [data, data.user, data.user_info]——data 根节点优先。
-    // CloudAccount.profile() 昵称取 data.user_name，头像取 ProfileRules.avatarUrl(data)。
-    // 旧版把 user_info 放在最前，服务端同时在 data 根与 user_info 下发头像/昵称时会取错值：
-    // 登录瞬间显示缓存里的正确资料，几秒后 profile() 实时拉回 user_info 的错值覆盖并写回缓存。
-    // 这里统一改成 data 根优先，昵称以 data.user_name 为首选（严格对齐官方 profile）。
-    const avatar = pickAvatar(data, user, data && data.user, data && data.user_info);
-    const rootName = data && typeof data.user_name === 'string' ? data.user_name.trim() : '';
-    const nickname = rootName || pickDisplayName(data, user, data && data.user, data && data.user_info) || '红果用户';
+    // 昵称取值对齐官方 ProfileRules：遍历 data / user / user_info / base_info / user_data /
+    // profile 各层的 screen_name、nickname、user_name、name，取第一个「非默认」值。
+    // 服务端对未完善资料账号会下发「用户+账号ID」这类默认昵称（如「用户486284977552」），
+    // 它不是用户设置的昵称；若只取某个节点（如 user_info）的默认值，就会把其它节点上的
+    // 真实昵称埋没，表现为「登录瞬间显示缓存里的正确昵称，几秒后 profile 回来变错」。
+    // 跳过默认值继续找，真实昵称落在哪一层都能取到；全是默认值时才退回服务端默认值。
+    const nameNodes = [user, data && data.user, data && data.user_info, data && data.base_info, data && data.user_data, data && data.profile, data];
+    const nameKeys = ['screen_name', 'nickname', 'user_name', 'name'];
+    const nameCandidates = [];
+    for (let ni = 0; ni < nameNodes.length; ni++) {
+      const node = nameNodes[ni];
+      if (!node || typeof node !== 'object') continue;
+      for (let ki = 0; ki < nameKeys.length; ki++) {
+        const nv = node[nameKeys[ki]];
+        if (typeof nv === 'string' && nv.trim()) nameCandidates.push(nv.trim());
+      }
+    }
+    const isDefaultName = /^用户\s*\d{5,}$/;
+    let finalName = '';
+    for (let ci = 0; ci < nameCandidates.length; ci++) {
+      if (!isDefaultName.test(nameCandidates[ci])) { finalName = nameCandidates[ci]; break; }
+    }
+    if (!finalName) finalName = nameCandidates[0] || '';
+    const avatar = pickAvatar(user, data && data.user, data && data.user_info, data && data.base_info, data);
     return {
       id,
       bizUserId: pickNumericId(user.biz_user_id, data && data.biz_user_id) || id,
       encodeUserId,
-      nickname: String(nickname).slice(0, 80),
+      nickname: String(finalName || '红果用户').slice(0, 80),
       avatar
     };
   }
   if (action === 'webInfo') {
     if (response.message !== 'success' || !data) throw new Error('官方登录请求失败');
-    // 官网资料同样走 ProfileRules.displayName/avatarUrl——data 根节点优先。
     const user = (data && (data.user_info || data.base_info || data.user_data || data.user)) || data || {};
     const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
     return {
       id: /^\d{1,30}$/.test(id) ? id : '',
-      nickname: String(pickDisplayName(data, user, data && data.user, data && data.user_info) || '红果用户').slice(0, 80),
-      avatar: pickAvatar(data, user, data && data.user, data && data.user_info),
+      nickname: String(user.name || user.user_name || user.screen_name || pickDisplayName(user, data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
+      avatar: pickAvatar(user, data && data.user, data && data.user_info, data),
       valid: true
     };
   }

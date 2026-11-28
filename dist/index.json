@@ -2,10 +2,10 @@
   "schema": 1,
   "packageName": "com.x.hongguotv.bate",
   "script": {
-    "version": "v1.0.6-20261128",
+    "version": "v1.0.7-20261128",
     "path": "dist/hongguoTV/HongGuoTV.js",
-    "size": 586384,
-    "sha256": "3e4bad5dcc1baa57c9a20ec455dadcfc1bcc828ea8e5bdb8eb5b7cdb53bbaa2c",
-    "builtAt": "2026-11-28T18:54+08:00"
+    "size": 587158,
+    "sha256": "0dd735ceaec84d050e21539b7f9f153bb6994ccb7f5576d557ca30dab0de3efb",
+    "builtAt": "2026-11-28T19:19+08:00"
   }
 }
