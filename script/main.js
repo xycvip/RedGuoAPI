@@ -6124,6 +6124,36 @@ var AppPhoneLogin = (function () {
   var submittedCodes = Object.create(null);
   var selfCookies = {};     // 本门面自己的 cookie jar
 
+  // 状态持久化：宿主每次调用都新建 Runtime，闭包变量会丢失，必须经 host.cacheGet/cacheSet
+  // 跨调用恢复。与 feed/search 的分页状态同理；验证码流程 send -> verify 分两次调用。
+  var PHONE_STATE_KEY = 'hongguo.phone.state';
+  var PHONE_STATE_TTL = 15 * 60 * 1000; // 验证码 15 分钟内有效
+  function loadPhoneState() {
+    try {
+      var raw = cacheGet(PHONE_STATE_KEY);
+      if (!raw) return;
+      var st = JSON.parse(raw);
+      if (!st || typeof st !== 'object') return;
+      mobile = str(st.mobile); ticket = str(st.ticket);
+      sent = !!st.sent;
+      nextSmsAt = Number(st.nextSmsAt) || 0;
+      submittedCodes = (st.submittedCodes && typeof st.submittedCodes === 'object') ? st.submittedCodes : Object.create(null);
+      selfCookies = (st.selfCookies && typeof st.selfCookies === 'object') ? st.selfCookies : {};
+    } catch (_) { /* 缓存损坏时维持内存态 */ }
+  }
+  function savePhoneState() {
+    try {
+      cacheSet(PHONE_STATE_KEY, JSON.stringify({
+        mobile: mobile, ticket: ticket, sent: sent, nextSmsAt: nextSmsAt,
+        submittedCodes: submittedCodes, selfCookies: selfCookies
+      }), PHONE_STATE_TTL);
+    } catch (_) { /* 持久化失败不影响本次调用 */ }
+  }
+  function clearPhoneState() {
+    try { cacheSet(PHONE_STATE_KEY, ''); } catch (_) {}
+  }
+  loadPhoneState();
+
   function formatPhone(countryCode, number) {
     var country = String(countryCode || '').trim().replace(/^\+/, '');
     var digits = String(number || '').replace(/[\s-]/g, '');
@@ -6154,6 +6184,7 @@ var AppPhoneLogin = (function () {
       var k = pair.slice(0, eq).trim(), v = pair.slice(eq + 1).trim();
       if (k && v) selfCookies[k] = v;
     });
+    savePhoneState();
   }
   function hasSession() {
     return !!(selfCookies.sessionid && String(selfCookies.sessionid).trim()) ||
@@ -6225,6 +6256,7 @@ var AppPhoneLogin = (function () {
   function localNumber() { return mobile.indexOf('+86 ') === 0 ? mobile.slice(4) : mobile; }
 
   async function send(number) {
+    loadPhoneState();
     if (Date.now() < nextSmsAt) throw new Error('请等待短信冷却后再试');
     mobile = parsePhone(number);
     sent = false; ticket = ''; submittedCodes = Object.create(null); selfCookies = {};
@@ -6236,17 +6268,20 @@ var AppPhoneLogin = (function () {
     retry = Math.min(3600, Math.max(1, retry));
     nextSmsAt = Date.now() + retry * 1000;
     sent = true;
+    savePhoneState();
     var digits = localNumber();
     var masked = digits.length >= 7 ? digits.slice(0, 3) + '****' + digits.slice(-4) : '你的手机';
     return { valid: true, mobile: masked, retryAfter: retry };
   }
 
   async function verify(code) {
+    loadPhoneState();
     if (!sent) throw new Error('请先重新获取验证码');
     if (!/^[0-9]{4,8}$/.test(str(code))) throw new Error('请输入 4—8 位验证码');
     if (submittedCodes[code]) throw Object.assign(new Error('这个验证码已提交过，请输入新的验证码'), { canRetryCode: true });
     submittedCodes[code] = true;
     sent = false;
+    savePhoneState();
     var sawExpired = false;
     for (var i = 0; i < VERIFY_ATTEMPTS.length; i++) {
       var path = VERIFY_ATTEMPTS[i][0], form = VERIFY_ATTEMPTS[i][1];
@@ -6257,11 +6292,13 @@ var AppPhoneLogin = (function () {
       var data = reply && reply.data ? reply.data : {};
       var newTicket = str(data.mobile_ticket);
       if (newTicket) ticket = newTicket;
+      savePhoneState();
       var ec = Number(data.error_code) || 0;
       if (ec === 0) continue;
       if (ec === 1) { sawExpired = true; continue; }
       var f = failure(data);
       sent = f.canRetryCode;
+      savePhoneState();
       throw f;
     }
     throw new Error(sawExpired ? '登录会话已失效，请重新获取验证码' : '登录没有成功，平台没有下发登录态');
@@ -6270,6 +6307,7 @@ var AppPhoneLogin = (function () {
   function reset() {
     mobile = ''; ticket = ''; sent = false; nextSmsAt = 0;
     submittedCodes = Object.create(null); selfCookies = {};
+    clearPhoneState();
   }
 
   return { send: send, verify: verify, reset: reset, currentCookies: fillCookies };
