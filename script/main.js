@@ -6218,6 +6218,11 @@ var AppPhoneLogin = (function () {
       rand: function () { return (Math.random() * 4294967296) | 0; }
     });
     var headers = Object.assign({}, signed.headers);
+    // 与官方 App 一致：body 是 application/x-www-form-urlencoded 表单，
+    // 实际发出的 Content-Type 必须被覆盖成 x-www-form-urlencoded。
+    // 官方 OkHttp 用 toRequestBody("application/x-www-form-urlencoded") 覆盖了 sign() 里的 json；
+    // JS 直接走 g.fetch 不会覆盖，若不在此改正，服务端按 JSON 解析表单会失败并返回 1002。
+    if (payload) headers['Content-Type'] = 'application/x-www-form-urlencoded';
     // App 通道刻意不回传 cookie：把 send_code 的 cookie 带到 sms_login 会被判 2046
     var res = await g.fetch(signed.url, {
       method: payload ? 'POST' : 'GET',
@@ -6244,10 +6249,11 @@ var AppPhoneLogin = (function () {
     else if (code === 1105) message = '红果要求额外验证，本次登录未完成';
     else if (code === 1106 || code === 1107) message = '请求过于频繁，请稍后再试';
     else if (code === 1203) message = '错误次数过多或验证码已过期，请重新获取验证码';
+    else if (code === 1002) message = '验证码未通过校验，请核对后重新输入，若仍失败请重新获取验证码';
     else message = '手机号登录失败，请稍后重试';
     var err = new Error(message + '（错误码 ' + code + '）');
     err.code = code;
-    err.canRetryCode = !needsWebsite && (code === 1102 || code === 1202);
+    err.canRetryCode = !needsWebsite && (code === 1102 || code === 1202 || code === 1002);
     err.needsWebsite = needsWebsite;
     return err;
   }
