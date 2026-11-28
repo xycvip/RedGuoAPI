@@ -3451,28 +3451,38 @@ spider.accountParse = function (action, text) {
     if (!/^\d{1,30}$/.test(id)) throw new Error('账号资料验证失败，请重新扫码');
     const rawUserId = String(user.user_id || (data && data.user_id) || '');
     const encodeUserId = rawUserId && !/^\d+$/.test(rawUserId) ? rawUserId : '';
-    const avatar = pickAvatar(user, data && data.user, data && data.user_info, data);
+    // 官方 ProfileRules.nodes() 遍历顺序为 [data, data.user, data.user_info]——data 根节点优先。
+    // CloudAccount.profile() 昵称取 data.user_name，头像取 ProfileRules.avatarUrl(data)。
+    // 旧版把 user_info 放在最前，服务端同时在 data 根与 user_info 下发头像/昵称时会取错值：
+    // 登录瞬间显示缓存里的正确资料，几秒后 profile() 实时拉回 user_info 的错值覆盖并写回缓存。
+    // 这里统一改成 data 根优先，昵称以 data.user_name 为首选（严格对齐官方 profile）。
+    const avatar = pickAvatar(data, user, data && data.user, data && data.user_info);
+    const rootName = data && typeof data.user_name === 'string' ? data.user_name.trim() : '';
+    const nickname = rootName || pickDisplayName(data, user, data && data.user, data && data.user_info) || '红果用户';
     return {
       id,
       bizUserId: pickNumericId(user.biz_user_id, data && data.biz_user_id) || id,
       encodeUserId,
-      nickname: String(user.user_name || user.nickname || user.screen_name || user.name || pickDisplayName(data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
+      nickname: String(nickname).slice(0, 80),
       avatar
     };
   }
   if (action === 'webInfo') {
     if (response.message !== 'success' || !data) throw new Error('官方登录请求失败');
+    // 官网资料同样走 ProfileRules.displayName/avatarUrl——data 根节点优先。
     const user = (data && (data.user_info || data.base_info || data.user_data || data.user)) || data || {};
     const id = String(user.user_id_str || user.user_id || user.biz_user_id || user.id || '');
     return {
       id: /^\d{1,30}$/.test(id) ? id : '',
-      nickname: String(user.name || user.user_name || user.screen_name || pickDisplayName(data && data.user, data && data.user_info, data) || '红果用户').slice(0, 80),
-      avatar: pickAvatar(user, data && data.user, data && data.user_info, data),
+      nickname: String(pickDisplayName(data, user, data && data.user, data && data.user_info) || '红果用户').slice(0, 80),
+      avatar: pickAvatar(data, user, data && data.user, data && data.user_info),
       valid: true
     };
   }
-  if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow'].includes(action)) {
-    if (String(response.code) !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code));
+  if (['favoriteUpdate', 'progressUpdate', 'likeUpdate', 'creatorFollow', 'reserveUpdate', 'historyDelete'].includes(action)) {
+    // 服务端拒绝（如风控 code=101144）必须如实抛错，不能被当成上传成功。
+    // reserveUpdate/historyDelete 以前落到底部登录校验，导致 {"code":0} 成功响应也被误判失败。
+    if (String(response.code ?? response.status_code ?? '') !== '0') throw new Error('ACCOUNT_BUSINESS_' + Number(response.code ?? response.status_code));
     return { valid: true };
   }
   if (action === 'creatorWorks') {
@@ -6488,39 +6498,43 @@ var AppPhoneLogin = (function () {
 
     var parsed = api.accountParse(action, await response.text());
 
-    // 云端历史列表（read_progress/list）只返回剧集 id 与播放进度，不带封面/标题。
-    // 官方 App 会再按 book_id 批量拉 multi-detail 补封面，否则「观看历史」只有空海报卡。
-    // 这里对缺封面的条目补一次详情，失败不影响历史列表本身（封面留空由宿主兜底）。
-    if (action === "history" && parsed && Array.isArray(parsed.items)) {
+    // 云端收藏（bookshelf/video/list）和观看历史（read_progress/list）的轻量列表只返回剧集 id
+    // 与时间/进度，不带封面和标题。官方 App 会按 book_id 每批 50、最多 200 条拉 multi-detail
+    // 补 thumb_url 封面与标题（CloudAccount.favorites/detailRows/detailedSeries），否则只剩空海报卡。
+    // 这里对缺封面的条目补一次详情，失败不影响列表本身（封面留空由宿主兜底）。
+    if ((action === "history" || action === "favorites") && parsed && Array.isArray(parsed.items)) {
       var needDetail = parsed.items.filter(function (it) {
         return it && it.id && /^[1-9]\d{0,29}$/.test(String(it.id)) && !it.cover;
       });
       if (needDetail.length) {
-        try {
-          var ids = needDetail.map(function (it) { return String(it.id); }).slice(0, 50);
-          var detailReq = await api.account("libraryDetails", { ids: ids.join(",") });
-          var detailHeaders = Object.assign({}, detailReq.headers || {});
-          if (sessionCookie) detailHeaders["Cookie"] = sessionCookie;
-          var detailResp = await g.fetch(detailReq.url, {
-            method: String(detailReq.method || "GET").toUpperCase(),
-            headers: detailHeaders,
-            body: detailReq.body === undefined ? "" : detailReq.body,
-            timeoutMs: options.timeoutMs,
-          });
-          if (detailResp.ok) {
-            var detailParsed = api.accountParse("libraryDetails", await detailResp.text());
-            var byId = {};
-            (detailParsed.items || []).forEach(function (d) { if (d && d.id) byId[String(d.id)] = d; });
-            parsed.items.forEach(function (it) {
-              var d = it && byId[String(it.id)];
-              if (!d) return;
-              if (!it.cover && d.cover) it.cover = d.cover;
-              if (!it.title && d.title) it.title = d.title;
-              if (!it.description && d.description) it.description = d.description;
-              if (!it.episodes && d.episodes) it.episodes = d.episodes;
+        var ids = needDetail.map(function (it) { return String(it.id); }).slice(0, 200);
+        var byId = {};
+        for (var dstart = 0; dstart < ids.length; dstart += 50) {
+          try {
+            var batch = ids.slice(dstart, dstart + 50);
+            var detailReq = await api.account("libraryDetails", { ids: batch.join(",") });
+            var detailHeaders = Object.assign({}, detailReq.headers || {});
+            if (sessionCookie) detailHeaders["Cookie"] = sessionCookie;
+            var detailResp = await g.fetch(detailReq.url, {
+              method: String(detailReq.method || "GET").toUpperCase(),
+              headers: detailHeaders,
+              body: detailReq.body === undefined ? "" : detailReq.body,
+              timeoutMs: options.timeoutMs,
             });
-          }
-        } catch (_) { /* 详情补齐失败：保留原列表，封面留空 */ }
+            if (detailResp.ok) {
+              var detailParsed = api.accountParse("libraryDetails", await detailResp.text());
+              (detailParsed.items || []).forEach(function (d) { if (d && d.id) byId[String(d.id)] = d; });
+            }
+          } catch (_) { /* 某批详情失败：保留该批原样，继续其余批次 */ }
+        }
+        parsed.items.forEach(function (it) {
+          var d = it && byId[String(it.id)];
+          if (!d) return;
+          if (!it.cover && d.cover) it.cover = d.cover;
+          if (!it.title && d.title) it.title = d.title;
+          if (!it.description && d.description) it.description = d.description;
+          if (!it.episodes && d.episodes) it.episodes = d.episodes;
+        });
       }
     }
 
